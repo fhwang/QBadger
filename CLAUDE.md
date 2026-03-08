@@ -19,10 +19,11 @@ This repo uses git worktrees for parallel development. The main branch checkout 
 
 ### Creating a worktree
 
-From the `main/` directory:
+From the `main/` directory, always fetch from origin first to ensure you're branching off the latest main:
 
 ```bash
-git worktree add ../<issue-number>-<short-description> -b <issue-number>-<short-description>
+git fetch origin
+git worktree add ../<issue-number>-<short-description> -b <issue-number>-<short-description> origin/main
 ```
 
 ### Removing a worktree
@@ -32,3 +33,20 @@ From the `main/` directory:
 ```bash
 git worktree remove ../<branch-name>
 ```
+
+## Project Conventions
+
+- **Language:** TypeScript
+- **Runtime:** Node.js 22 (see `.nvmrc`)
+- **Package manager:** pnpm
+- **Build:** `pnpm build` (tsc)
+- **Test:** `pnpm test` (vitest)
+- **Lint:** `pnpm lint` (eslint, no Prettier)
+- **Dev:** `pnpm dev` (tsx watch)
+
+### Directory Structure
+
+- `src/` — application source
+- `test/` — test files (`*.test.ts`)
+- `scripts/` — build/deploy scripts
+- `docs/` — documentation and plans
