@@ -17,6 +17,9 @@ importers:
       eslint:
         specifier: ^10.0.3
         version: 10.0.3
+      forbid-junk-object-types:
+        specifier: ^1.4.0
+        version: 1.4.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -631,6 +634,11 @@ packages:
 
   flatted@3.4.0:
     resolution: {integrity: sha512-kC6Bb+ooptOIvWj5B63EQWkF0FEnNjV2ZNkLMLZRDDduIiWeFF4iKnslwhiWxjAdbg4NzTNo6h0qLuvFrcx+Sw==}
+
+  forbid-junk-object-types@1.4.0:
+    resolution: {integrity: sha512-sFW7jXb1MGDswnUfTKXJpv2an3tEx02HxKxERuiT4i5dBI3f8PVAOvu9HbGaC5upPwiXEuNJW5Hy4K8fkfLHdQ==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -1438,6 +1446,10 @@ snapshots:
       keyv: 4.5.4
 
   flatted@3.4.0: {}
+
+  forbid-junk-object-types@1.4.0:
+    dependencies:
+      typescript: 5.9.3
 
   fsevents@2.3.3:
     optional: true
