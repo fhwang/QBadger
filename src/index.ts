@@ -1,16 +1,21 @@
 import { createApp } from "./server.js";
+import { loadConfig, ConfigError } from "./config.js";
 import { logger } from "./logger.js";
 
-const PORT = parseInt(process.env.PORT ?? "3000", 10);
-const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
-
-if (!WEBHOOK_SECRET) {
-  logger.fatal("GITHUB_WEBHOOK_SECRET environment variable is required");
+let config;
+try {
+  config = loadConfig();
+} catch (e) {
+  if (e instanceof ConfigError) {
+    logger.fatal(e.message);
+  } else {
+    logger.fatal(e, "Unexpected error loading configuration");
+  }
   process.exit(1);
 }
 
-const app = createApp(WEBHOOK_SECRET);
+const app = createApp(config.githubWebhookSecret);
 
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, "QBadger webhook server started");
+app.listen(config.port, () => {
+  logger.info({ port: config.port }, "QBadger webhook server started");
 });
