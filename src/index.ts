@@ -2,7 +2,7 @@ import { createApp } from "./server.js";
 import { loadConfig, ConfigError } from "./config.js";
 import { logger } from "./logger.js";
 
-let config;
+let config: ReturnType<typeof loadConfig>;
 try {
   config = loadConfig();
 } catch (e) {

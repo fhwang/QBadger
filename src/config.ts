@@ -5,25 +5,13 @@ export class ConfigError extends Error {
   }
 }
 
-export interface Config {
-  githubToken: string;
-  githubWebhookSecret: string;
-  anthropicApiKey: string;
-  botUsername: string;
-  targetRepo: string;
-  maxConcurrentSessions: number;
-  sessionTimeoutHours: number;
-  maxCiRetries: number;
-  port: number;
-}
-
 const REQUIRED_VARS = [
   "GITHUB_TOKEN",
   "GITHUB_WEBHOOK_SECRET",
   "ANTHROPIC_API_KEY",
 ] as const;
 
-export function loadConfig(): Config {
+export function loadConfig() {
   const missing = REQUIRED_VARS.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     throw new ConfigError(
