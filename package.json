@@ -18,12 +18,19 @@
   "packageManager": "pnpm@10.31.0",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.3.5",
+    "@types/supertest": "^7.2.0",
     "eslint": "^10.0.3",
     "forbid-junk-object-types": "^1.4.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "pino": "^10.3.1"
   }
 }
