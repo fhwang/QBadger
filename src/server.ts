@@ -1,11 +1,12 @@
 import crypto from "node:crypto";
-import express from "express";
-import type { Request, Response, NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { handleIssuesAssigned } from "./handlers/issues-assigned.js";
 import { handleIssueCommentCreated } from "./handlers/issue-comment-created.js";
 import { handleCheckSuiteCompleted } from "./handlers/check-suite-completed.js";
 import { handlePullRequestReviewSubmitted } from "./handlers/pull-request-review-submitted.js";
 import { logger } from "./logger.js";
+
+const HTTP_UNAUTHORIZED = 401;
 
 type WebhookHandler = (body: Record<string, unknown>) => void;
 
@@ -61,7 +62,7 @@ export function createApp(webhookSecret: string): express.Express {
 
       if (!signature || !verifySignature(webhookSecret, rawBody, signature)) {
         logger.warn("Webhook signature verification failed");
-        res.status(401).json({ error: "Invalid signature" });
+        res.status(HTTP_UNAUTHORIZED).json({ error: "Invalid signature" });
         return;
       }
       next();
