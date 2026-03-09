@@ -37,7 +37,7 @@ git worktree remove ../<branch-name>
 ## Project Conventions
 
 - **Language:** TypeScript
-- **Runtime:** Node.js 22 (see `.nvmrc`)
+- **Runtime:** Node.js 22 (see `.nvmrc`). Node is already on the PATH — do not prefix commands with `source ~/.nvm/nvm.sh && nvm use`.
 - **Package manager:** pnpm
 - **Build:** `pnpm build` (tsc)
 - **Test:** `pnpm test` (vitest)
