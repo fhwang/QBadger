@@ -1,91 +1,48 @@
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type Options, type SDKMessage, type SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
 
-export interface SessionOptions {
-  prompt: string;
-  model?: string;
-  maxTurns?: number;
-  allowedTools?: string[];
-  systemPrompt?: string;
-  abortController?: AbortController;
-  timeoutMs?: number;
-}
+function findResult(stream: AsyncIterable<SDKMessage>) {
+  return async (): Promise<SDKResultMessage> => {
+    let result: SDKResultMessage | undefined;
+    for await (const message of stream) {
+      if (message.type === "result") {
+        result = message;
+      }
+    }
 
-export interface SessionResult {
-  success: boolean;
-  output?: string;
-  errors?: string[];
-  durationMs: number;
-  numTurns: number;
-  totalCostUsd: number;
-  sessionId: string;
-}
-
-function toSessionResult(message: SDKMessage): SessionResult | undefined {
-  if (message.type !== "result") {
-    return undefined;
-  }
-
-  if (message.subtype === "success") {
-    return {
-      success: true,
-      output: message.result,
-      durationMs: message.duration_ms,
-      numTurns: message.num_turns,
-      totalCostUsd: message.total_cost_usd,
-      sessionId: message.session_id,
-    };
-  }
-
-  return {
-    success: false,
-    errors: message.errors,
-    durationMs: message.duration_ms,
-    numTurns: message.num_turns,
-    totalCostUsd: message.total_cost_usd,
-    sessionId: message.session_id,
+    if (!result) {
+      throw new Error("Session ended without a result message");
+    }
+    return result;
   };
 }
 
-function buildAbortController(options: SessionOptions) {
+function buildAbortController(options: Options, timeoutMs?: number) {
   if (options.abortController) {
     return { controller: options.abortController, timeoutId: undefined };
   }
 
-  if (options.timeoutMs) {
+  if (timeoutMs) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     return { controller, timeoutId };
   }
 
   return { controller: undefined, timeoutId: undefined };
 }
 
-async function consumeStream(stream: AsyncIterable<SDKMessage>): Promise<SessionResult> {
-  let result: SessionResult | undefined;
-  for await (const message of stream) {
-    result = toSessionResult(message) ?? result;
-  }
-
-  if (!result) {
-    throw new Error("Session ended without a result message");
-  }
-  return result;
-}
-
-export async function runSession(options: SessionOptions): Promise<SessionResult> {
-  const { controller: abortController, timeoutId } = buildAbortController(options);
+export async function runSession(
+  prompt: string,
+  options?: Options,
+  timeoutMs?: number,
+): Promise<SDKResultMessage> {
+  const sdkOptions = options ?? {};
+  const { controller: abortController, timeoutId } = buildAbortController(sdkOptions, timeoutMs);
 
   try {
-    return await consumeStream(query({
-      prompt: options.prompt,
-      options: {
-        model: options.model,
-        maxTurns: options.maxTurns,
-        allowedTools: options.allowedTools,
-        systemPrompt: options.systemPrompt,
-        abortController,
-      },
-    }));
+    return await findResult(query({
+      prompt,
+      options: { ...sdkOptions, abortController },
+    }))();
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);

@@ -52,55 +52,39 @@ describe("runSession", () => {
       successResult,
     ]);
 
-    const result = await runSession({ prompt: "Say hello" });
+    const result = await runSession("Say hello");
 
-    expect(result).toEqual({
-      success: true,
-      output: "Done! Created the file.",
-      durationMs: 1000,
-      numTurns: 3,
-      totalCostUsd: 0.05,
-      sessionId: "test-session-id",
-    });
+    expect(result).toEqual(successResult);
   });
 
   it("returns an error result when session fails", async () => {
-    mockQueryStream([
-      {
-        type: "result",
-        subtype: "error_during_execution",
-        duration_ms: 500,
-        duration_api_ms: 400,
-        is_error: true,
-        num_turns: 1,
-        stop_reason: null,
-        total_cost_usd: 0.01,
-        usage: { input_tokens: 50, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, server_tool_use_input_tokens: 0 },
-        modelUsage: {},
-        permission_denials: [],
-        errors: ["Something went wrong"],
-        uuid: "00000000-0000-0000-0000-000000000001" as UUID,
-        session_id: "error-session-id",
-      },
-    ]);
-
-    const result = await runSession({ prompt: "Do something" });
-
-    expect(result).toEqual({
-      success: false,
+    const errorResult = {
+      type: "result",
+      subtype: "error_during_execution",
+      duration_ms: 500,
+      duration_api_ms: 400,
+      is_error: true,
+      num_turns: 1,
+      stop_reason: null,
+      total_cost_usd: 0.01,
+      usage: { input_tokens: 50, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
       errors: ["Something went wrong"],
-      durationMs: 500,
-      numTurns: 1,
-      totalCostUsd: 0.01,
-      sessionId: "error-session-id",
-    });
+      uuid: "00000000-0000-0000-0000-000000000001" as UUID,
+      session_id: "error-session-id",
+    };
+    mockQueryStream([errorResult]);
+
+    const result = await runSession("Do something");
+
+    expect(result).toEqual(errorResult);
   });
 
   it("passes options to the SDK query", async () => {
     mockQueryStream([makeSuccessResult()]);
 
-    await runSession({
-      prompt: "Build it",
+    await runSession("Build it", {
       model: "claude-sonnet-4-5-20250929",
       maxTurns: 10,
       allowedTools: ["Read", "Write", "Bash"],
@@ -109,12 +93,12 @@ describe("runSession", () => {
 
     expect(mockedQuery).toHaveBeenCalledWith({
       prompt: "Build it",
-      options: {
+      options: expect.objectContaining({
         model: "claude-sonnet-4-5-20250929",
         maxTurns: 10,
         allowedTools: ["Read", "Write", "Bash"],
         systemPrompt: "You are a coding assistant",
-      },
+      }),
     });
   });
 
@@ -123,7 +107,7 @@ describe("runSession", () => {
       { type: "assistant", message: { content: "Hi" } },
     ]);
 
-    await expect(runSession({ prompt: "Hello" })).rejects.toThrow(
+    await expect(runSession("Hello")).rejects.toThrow(
       "Session ended without a result message",
     );
   });
@@ -138,9 +122,9 @@ describe("runSession", () => {
     }
     mockedQuery.mockReturnValue(abortingGenerator() as ReturnType<typeof query>);
 
-    await expect(runSession({ prompt: "Do work", abortController: controller })).rejects.toThrow(
-      "The operation was aborted",
-    );
+    await expect(
+      runSession("Do work", { abortController: controller }),
+    ).rejects.toThrow("The operation was aborted");
 
     expect(mockedQuery).toHaveBeenCalledWith({
       prompt: "Do work",
@@ -151,20 +135,17 @@ describe("runSession", () => {
   });
 
   it("supports timeout via AbortController", async () => {
-    // Verify that timeoutMs creates an AbortController that aborts after the timeout
     async function* hangingGenerator() {
       yield { type: "assistant", message: { content: "Starting..." } };
-      // Simulate a long-running session
       await new Promise((resolve) => setTimeout(resolve, 100));
       throw new DOMException("The operation was aborted", "AbortError");
     }
     mockedQuery.mockReturnValue(hangingGenerator() as ReturnType<typeof query>);
 
-    await expect(runSession({ prompt: "Do work", timeoutMs: 50 })).rejects.toThrow(
+    await expect(runSession("Do work", {}, 50)).rejects.toThrow(
       "The operation was aborted",
     );
 
-    // Verify an AbortController was passed to the SDK
     expect(mockedQuery).toHaveBeenCalledWith({
       prompt: "Do work",
       options: expect.objectContaining({
