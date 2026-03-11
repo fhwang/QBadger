@@ -1,0 +1,10 @@
+{
+  "src/session-runner.ts": {
+    "SessionOptions": {
+      "reason": "Exported for use by callers in other modules (e.g., issue-to-PR pipeline)"
+    },
+    "SessionResult": {
+      "reason": "Exported for use by callers in other modules (e.g., issue-to-PR pipeline)"
+    }
+  }
+}

@@ -2,6 +2,9 @@ import { createApp } from "./server.js";
 import { loadConfig, ConfigError } from "./config.js";
 import { logger } from "./logger.js";
 
+export { runSession } from "./session-runner.js";
+export type { SessionOptions, SessionResult } from "./session-runner.js";
+
 let config: ReturnType<typeof loadConfig>;
 try {
   config = loadConfig();
