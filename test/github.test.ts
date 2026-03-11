@@ -1,3 +1,4 @@
+import { Octokit } from "@octokit/rest";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GitHubService } from "../src/github.js";
 
@@ -241,4 +242,22 @@ describe("GitHubService", () => {
       });
     });
   });
+});
+
+describe("GitHubService integration", () => {
+  const shouldRun =
+    process.env.RUN_INTEGRATION_TESTS === "true" &&
+    Boolean(process.env.GITHUB_TOKEN);
+
+  it.skipIf(!shouldRun)(
+    "reads a real issue from lost-atlas/lost-atlas",
+    async () => {
+      const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+      const service = new GitHubService(octokit, "lost-atlas/lost-atlas");
+      const issue = await service.getIssue(1);
+
+      expect(issue.number).toBe(1);
+      expect(issue.title).toBeDefined();
+    },
+  );
 });
