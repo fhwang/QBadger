@@ -11,9 +11,14 @@ export class GitHubService {
   private readonly octokit: Octokit;
 
   constructor(octokit: Octokit, targetRepo: string) {
-    const parts = targetRepo.split("/");
-    this.owner = parts[0] as string;
-    this.repo = parts[1] as string;
+    const slashIndex = targetRepo.indexOf("/");
+    if (slashIndex < 1 || slashIndex === targetRepo.length - 1) {
+      throw new Error(
+        `Invalid targetRepo format: "${targetRepo}" (expected "owner/repo")`,
+      );
+    }
+    this.owner = targetRepo.slice(0, slashIndex);
+    this.repo = targetRepo.slice(slashIndex + 1);
     this.octokit = octokit;
   }
 
