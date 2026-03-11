@@ -30,6 +30,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@octokit/rest": "^22.0.1",
     "express": "^5.2.1",
     "pino": "^10.3.1"
   }
