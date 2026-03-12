@@ -23,6 +23,17 @@ export interface ContainerResult {
   timedOut: boolean;
 }
 
+function createTimeout(ms: number) {
+  let timer: ReturnType<typeof setTimeout>;
+  const promise = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), ms);
+  });
+  return {
+    promise,
+    clear() { clearTimeout(timer); },
+  };
+}
+
 export class ContainerRunner {
   private docker: Dockerode;
   private log = logger.child({ module: "ContainerRunner" });
@@ -31,20 +42,18 @@ export class ContainerRunner {
     this.docker = docker;
   }
 
-  private buildHostConfig(config: ContainerConfig): Dockerode.HostConfig | undefined {
-    if (!config.volumes?.length) {
-      return undefined;
-    }
-
-    return {
-      Binds: config.volumes.map((v) => {
-        const mode = v.readOnly ? "ro" : "rw";
-        return `${v.hostPath}:${v.containerPath}:${mode}`;
-      }),
-    };
+  private buildBinds(volumes: VolumeMount[]): string[] {
+    return volumes.map((v) => {
+      const mode = v.readOnly ? "ro" : "rw";
+      return `${v.hostPath}:${v.containerPath}:${mode}`;
+    });
   }
 
   private buildContainerOptions(config: ContainerConfig): Dockerode.ContainerCreateOptions {
+    const hostConfig: Dockerode.HostConfig | undefined = config.volumes?.length
+      ? { Binds: this.buildBinds(config.volumes) }
+      : undefined;
+
     return {
       Image: config.image,
       Cmd: config.command,
@@ -52,35 +61,43 @@ export class ContainerRunner {
         ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`)
         : undefined,
       User: config.user,
-      HostConfig: this.buildHostConfig(config),
+      HostConfig: hostConfig,
     };
   }
 
-  private async waitWithTimeout(
+  private async raceWithTimeout(
     container: Dockerode.Container,
-    timeoutMs?: number,
-  ): Promise<{ waitResult: { StatusCode: number }; timedOut: boolean }> {
-    if (!timeoutMs) {
-      return { waitResult: await container.wait(), timedOut: false };
-    }
-
-    let timer: ReturnType<typeof setTimeout>;
-    const timeoutPromise = new Promise<"timeout">((resolve) => {
-      timer = setTimeout(() => resolve("timeout"), timeoutMs);
-    });
+    timeoutMs: number,
+  ): Promise<ContainerResult> {
+    const timeout = createTimeout(timeoutMs);
     const raceResult = await Promise.race([
-      container.wait().then((r: { StatusCode: number }) => ({ kind: "done" as const, result: r })),
-      timeoutPromise.then(() => ({ kind: "timeout" as const })),
+      container.wait().then((r) => ({ kind: "done" as const, statusCode: r.StatusCode })),
+      timeout.promise.then(() => ({ kind: "timeout" as const })),
     ]);
 
     if (raceResult.kind === "timeout") {
       this.log.warn({ containerId: container.id }, "Container timed out, stopping");
       await container.stop();
-      return { waitResult: await container.wait(), timedOut: true };
+      const finalResult = await container.wait();
+      return this.collectResult(container, finalResult.StatusCode, true);
     }
 
-    clearTimeout(timer!);
-    return { waitResult: raceResult.result, timedOut: false };
+    timeout.clear();
+    return this.collectResult(container, raceResult.statusCode, false);
+  }
+
+  private async collectResult(
+    container: Dockerode.Container,
+    exitCode: number,
+    timedOut: boolean,
+  ): Promise<ContainerResult> {
+    const logs = await container.logs({ stdout: true, stderr: true });
+    return {
+      containerId: container.id,
+      exitCode,
+      logs: String(logs),
+      timedOut,
+    };
   }
 
   async run(config: ContainerConfig): Promise<ContainerResult> {
@@ -89,15 +106,11 @@ export class ContainerRunner {
 
     try {
       await container.start();
-      const { waitResult, timedOut } = await this.waitWithTimeout(container, config.timeoutMs);
-      const logs = await container.logs({ stdout: true, stderr: true });
-
-      return {
-        containerId: container.id,
-        exitCode: waitResult.StatusCode,
-        logs: String(logs),
-        timedOut,
-      };
+      if (config.timeoutMs) {
+        return await this.raceWithTimeout(container, config.timeoutMs);
+      }
+      const result = await container.wait();
+      return await this.collectResult(container, result.StatusCode, false);
     } finally {
       await container.remove({ force: true });
     }

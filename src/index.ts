@@ -3,6 +3,8 @@ import { loadConfig, ConfigError } from "./config.js";
 import { logger } from "./logger.js";
 
 export { runSession } from "./session-runner.js";
+export { ContainerRunner } from "./container-runner.js";
+export type { ContainerConfig, ContainerResult, VolumeMount } from "./container-runner.js";
 
 let config: ReturnType<typeof loadConfig>;
 try {
