@@ -64,9 +64,10 @@ export class ContainerRunner {
       return { waitResult: await container.wait(), timedOut: false };
     }
 
-    const timeoutPromise = new Promise<"timeout">((resolve) =>
-      setTimeout(() => resolve("timeout"), timeoutMs),
-    );
+    let timer: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), timeoutMs);
+    });
     const raceResult = await Promise.race([
       container.wait().then((r: { StatusCode: number }) => ({ kind: "done" as const, result: r })),
       timeoutPromise.then(() => ({ kind: "timeout" as const })),
@@ -78,6 +79,7 @@ export class ContainerRunner {
       return { waitResult: await container.wait(), timedOut: true };
     }
 
+    clearTimeout(timer!);
     return { waitResult: raceResult.result, timedOut: false };
   }
 
@@ -93,7 +95,7 @@ export class ContainerRunner {
       return {
         containerId: container.id,
         exitCode: waitResult.StatusCode,
-        logs: logs as unknown as string,
+        logs: String(logs),
         timedOut,
       };
     } finally {
