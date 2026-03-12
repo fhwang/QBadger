@@ -53,6 +53,7 @@ export class ContainerRunner {
       Env: config.env
         ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`)
         : undefined,
+      User: config.user,
       HostConfig: this.buildHostConfig(config),
     });
 

@@ -102,6 +102,19 @@ describe("ContainerRunner", () => {
     );
   });
 
+  it("runs container as specified user", async () => {
+    await runner.run({
+      image: "qbadger-worker:latest",
+      user: "1000:1000",
+    });
+
+    expect(mockDocker.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        User: "1000:1000",
+      }),
+    );
+  });
+
   it("mounts read-write volumes when readOnly is false", async () => {
     await runner.run({
       image: "qbadger-worker:latest",
