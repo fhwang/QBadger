@@ -1,3 +1,13 @@
+import type { HandlerConfig } from "./handler-config.js";
+
+interface AppConfig extends HandlerConfig {
+  githubToken: string;
+  githubWebhookSecret: string;
+  anthropicApiKey: string;
+  maxConcurrentSessions: number;
+  port: number;
+}
+
 export class ConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -11,7 +21,7 @@ const REQUIRED_VARS = [
   "ANTHROPIC_API_KEY",
 ] as const;
 
-export function loadConfig() {
+export function loadConfig(): AppConfig {
   const missing = REQUIRED_VARS.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     throw new ConfigError(
