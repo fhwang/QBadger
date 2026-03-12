@@ -80,4 +80,42 @@ describe("ContainerRunner", () => {
     );
     expect(result.exitCode).toBe(0);
   });
+
+  it("mounts volumes into the container", async () => {
+    await runner.run({
+      image: "qbadger-worker:latest",
+      volumes: [
+        { hostPath: "/home/user/.ssh", containerPath: "/root/.ssh", readOnly: true },
+        { hostPath: "/home/user/.gitconfig", containerPath: "/root/.gitconfig", readOnly: true },
+      ],
+    });
+
+    expect(mockDocker.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        HostConfig: expect.objectContaining({
+          Binds: [
+            "/home/user/.ssh:/root/.ssh:ro",
+            "/home/user/.gitconfig:/root/.gitconfig:ro",
+          ],
+        }),
+      }),
+    );
+  });
+
+  it("mounts read-write volumes when readOnly is false", async () => {
+    await runner.run({
+      image: "qbadger-worker:latest",
+      volumes: [
+        { hostPath: "/tmp/workspace", containerPath: "/workspace" },
+      ],
+    });
+
+    expect(mockDocker.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        HostConfig: expect.objectContaining({
+          Binds: ["/tmp/workspace:/workspace:rw"],
+        }),
+      }),
+    );
+  });
 });

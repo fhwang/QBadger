@@ -31,6 +31,19 @@ export class ContainerRunner {
     this.docker = docker;
   }
 
+  private buildHostConfig(config: ContainerConfig): Dockerode.HostConfig | undefined {
+    if (!config.volumes?.length) {
+      return undefined;
+    }
+
+    return {
+      Binds: config.volumes.map((v) => {
+        const mode = v.readOnly ? "ro" : "rw";
+        return `${v.hostPath}:${v.containerPath}:${mode}`;
+      }),
+    };
+  }
+
   async run(config: ContainerConfig): Promise<ContainerResult> {
     this.log.info({ image: config.image }, "Creating container");
 
@@ -40,6 +53,7 @@ export class ContainerRunner {
       Env: config.env
         ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`)
         : undefined,
+      HostConfig: this.buildHostConfig(config),
     });
 
     try {
