@@ -150,6 +150,16 @@ describe("ContainerRunner", () => {
     expect(result.timedOut).toBe(false);
   });
 
+  it("removes container even if start fails", async () => {
+    mockContainer.start.mockRejectedValue(new Error("start failed"));
+
+    await expect(
+      runner.run({ image: "qbadger-worker:latest" }),
+    ).rejects.toThrow("start failed");
+
+    expect(mockContainer.remove).toHaveBeenCalledWith({ force: true });
+  });
+
   it("mounts read-write volumes when readOnly is false", async () => {
     await runner.run({
       image: "qbadger-worker:latest",
