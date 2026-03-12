@@ -1,14 +1,25 @@
 import crypto from "node:crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
+import type { GitHubService } from "./github.js";
+import type { runSession as RunSessionFn } from "./session-runner.js";
 import { handleIssuesAssigned } from "./handlers/issues-assigned.js";
 import { handleIssueCommentCreated } from "./handlers/issue-comment-created.js";
 import { handleCheckSuiteCompleted } from "./handlers/check-suite-completed.js";
 import { handlePullRequestReviewSubmitted } from "./handlers/pull-request-review-submitted.js";
+import type { HandlerConfig } from "./handler-config.js";
 import { logger } from "./logger.js";
+
+export type { HandlerConfig } from "./handler-config.js";
+
+export interface HandlerDeps {
+  github: GitHubService;
+  runSession: typeof RunSessionFn;
+  config: HandlerConfig;
+}
 
 const HTTP_UNAUTHORIZED = 401;
 
-type WebhookHandler = (body: Record<string, unknown>) => void;
+type WebhookHandler = (body: Record<string, unknown>, deps: HandlerDeps) => void | Promise<void>;
 
 const HANDLERS: Record<string, Record<string, WebhookHandler>> = {
   issues: {
@@ -25,6 +36,19 @@ const HANDLERS: Record<string, Record<string, WebhookHandler>> = {
   },
 };
 
+function fireAndForget(
+  handler: WebhookHandler,
+  body: Record<string, unknown>,
+  deps: HandlerDeps,
+): void {
+  const maybePromise = handler(body, deps);
+  if (maybePromise instanceof Promise) {
+    maybePromise.catch((err: unknown) => {
+      logger.error({ err }, "Webhook handler failed");
+    });
+  }
+}
+
 function verifySignature(
   secret: string,
   payload: string,
@@ -37,7 +61,7 @@ function verifySignature(
   );
 }
 
-export function createApp(webhookSecret: string): express.Express {
+export function createApp(webhookSecret: string, deps: HandlerDeps): express.Express {
   const app = express();
 
   app.use(
@@ -76,7 +100,7 @@ export function createApp(webhookSecret: string): express.Express {
 
       if (handler) {
         logger.info({ event, action }, "Handling webhook event");
-        handler(req.body as Record<string, unknown>);
+        fireAndForget(handler, req.body as Record<string, unknown>, deps);
         res.json({ event, action, handled: true });
       } else {
         logger.info({ event, action }, "Unhandled webhook event");

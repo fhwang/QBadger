@@ -1,9 +1,27 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import crypto from "node:crypto";
 import request from "supertest";
-import { createApp } from "../src/server.js";
+import { createApp, type HandlerDeps } from "../src/server.js";
 
 const WEBHOOK_SECRET = "test-webhook-secret";
+
+function makeMockDeps(): HandlerDeps {
+  return {
+    github: {
+      getIssue: vi.fn(),
+      createBranch: vi.fn(),
+      createPullRequest: vi.fn(),
+      createComment: vi.fn(),
+    } as unknown as HandlerDeps["github"],
+    runSession: vi.fn(),
+    config: {
+      botUsername: "qbadger",
+      targetRepo: "lost-atlas/lost-atlas",
+      sessionTimeoutHours: 6,
+      maxCiRetries: 5,
+    },
+  };
+}
 
 function sign(body: string, secret: string): string {
   const hmac = crypto.createHmac("sha256", secret);
@@ -32,7 +50,7 @@ function webhookRequest(app: Express.Application, {
 
 describe("Health check", () => {
   it("returns 200 with status ok", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await request(app).get("/health");
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: "ok" });
@@ -41,7 +59,7 @@ describe("Health check", () => {
 
 describe("Webhook signature verification", () => {
   it("rejects requests with missing signature", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await request(app)
       .post("/webhook")
       .set("content-type", "application/json")
@@ -51,7 +69,7 @@ describe("Webhook signature verification", () => {
   });
 
   it("rejects requests with invalid signature", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "assigned" },
       signature: "sha256=invalid",
@@ -60,7 +78,7 @@ describe("Webhook signature verification", () => {
   });
 
   it("accepts requests with valid signature", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "assigned" },
       event: "issues",
@@ -71,7 +89,7 @@ describe("Webhook signature verification", () => {
 
 describe("Event routing", () => {
   it("routes issues.assigned events", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "assigned" },
       event: "issues",
@@ -85,7 +103,7 @@ describe("Event routing", () => {
   });
 
   it("routes issue_comment.created events", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "created" },
       event: "issue_comment",
@@ -99,7 +117,7 @@ describe("Event routing", () => {
   });
 
   it("routes check_suite.completed events", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "completed" },
       event: "check_suite",
@@ -113,7 +131,7 @@ describe("Event routing", () => {
   });
 
   it("routes pull_request_review.submitted events", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "submitted" },
       event: "pull_request_review",
@@ -127,7 +145,7 @@ describe("Event routing", () => {
   });
 
   it("returns 200 with handled:false for unhandled event types", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "opened" },
       event: "pull_request",
@@ -141,7 +159,7 @@ describe("Event routing", () => {
   });
 
   it("returns 200 with handled:false for unhandled action on handled event", async () => {
-    const app = createApp(WEBHOOK_SECRET);
+    const app = createApp(WEBHOOK_SECRET, makeMockDeps());
     const res = await webhookRequest(app, {
       body: { action: "opened" },
       event: "issues",
