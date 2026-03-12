@@ -59,14 +59,38 @@ export class ContainerRunner {
 
     try {
       await container.start();
-      const waitResult = await container.wait();
+
+      let timedOut = false;
+      let waitResult: { StatusCode: number };
+
+      if (config.timeoutMs) {
+        const timeoutPromise = new Promise<"timeout">((resolve) =>
+          setTimeout(() => resolve("timeout"), config.timeoutMs),
+        );
+        const raceResult = await Promise.race([
+          container.wait().then((r: { StatusCode: number }) => ({ kind: "done" as const, result: r })),
+          timeoutPromise.then(() => ({ kind: "timeout" as const })),
+        ]);
+
+        if (raceResult.kind === "timeout") {
+          timedOut = true;
+          this.log.warn({ containerId: container.id }, "Container timed out, stopping");
+          await container.stop();
+          waitResult = await container.wait();
+        } else {
+          waitResult = raceResult.result;
+        }
+      } else {
+        waitResult = await container.wait();
+      }
+
       const logs = await container.logs({ stdout: true, stderr: true });
 
       return {
         containerId: container.id,
         exitCode: waitResult.StatusCode,
         logs: logs as unknown as string,
-        timedOut: false,
+        timedOut,
       };
     } finally {
       await container.remove({ force: true });

@@ -115,6 +115,24 @@ describe("ContainerRunner", () => {
     );
   });
 
+  it("stops container and returns timedOut when timeout expires", async () => {
+    const neverResolve = new Promise<{ StatusCode: number }>(() => {});
+    mockContainer.wait.mockReturnValue(neverResolve);
+    mockContainer.stop.mockImplementation(async () => {
+      mockContainer.wait.mockResolvedValue({ StatusCode: 137 });
+    });
+
+    const result = await runner.run({
+      image: "qbadger-worker:latest",
+      timeoutMs: 50,
+    });
+
+    expect(result.timedOut).toBe(true);
+    expect(result.exitCode).toBe(137);
+    expect(mockContainer.stop).toHaveBeenCalled();
+    expect(mockContainer.remove).toHaveBeenCalled();
+  });
+
   it("mounts read-write volumes when readOnly is false", async () => {
     await runner.run({
       image: "qbadger-worker:latest",
