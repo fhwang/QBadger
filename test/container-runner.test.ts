@@ -116,10 +116,12 @@ describe("ContainerRunner", () => {
   });
 
   it("stops container and returns timedOut when timeout expires", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function, no-empty-function
     const neverResolve = new Promise<{ StatusCode: number }>(() => {});
     mockContainer.wait.mockReturnValue(neverResolve);
-    mockContainer.stop.mockImplementation(async () => {
+    mockContainer.stop.mockImplementation(() => {
       mockContainer.wait.mockResolvedValue({ StatusCode: 137 });
+      return Promise.resolve();
     });
 
     const result = await runner.run({

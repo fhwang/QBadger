@@ -44,10 +44,8 @@ export class ContainerRunner {
     };
   }
 
-  async run(config: ContainerConfig): Promise<ContainerResult> {
-    this.log.info({ image: config.image }, "Creating container");
-
-    const container = await this.docker.createContainer({
+  private buildContainerOptions(config: ContainerConfig): Dockerode.ContainerCreateOptions {
+    return {
       Image: config.image,
       Cmd: config.command,
       Env: config.env
@@ -55,35 +53,41 @@ export class ContainerRunner {
         : undefined,
       User: config.user,
       HostConfig: this.buildHostConfig(config),
-    });
+    };
+  }
+
+  private async waitWithTimeout(
+    container: Dockerode.Container,
+    timeoutMs?: number,
+  ): Promise<{ waitResult: { StatusCode: number }; timedOut: boolean }> {
+    if (!timeoutMs) {
+      return { waitResult: await container.wait(), timedOut: false };
+    }
+
+    const timeoutPromise = new Promise<"timeout">((resolve) =>
+      setTimeout(() => resolve("timeout"), timeoutMs),
+    );
+    const raceResult = await Promise.race([
+      container.wait().then((r: { StatusCode: number }) => ({ kind: "done" as const, result: r })),
+      timeoutPromise.then(() => ({ kind: "timeout" as const })),
+    ]);
+
+    if (raceResult.kind === "timeout") {
+      this.log.warn({ containerId: container.id }, "Container timed out, stopping");
+      await container.stop();
+      return { waitResult: await container.wait(), timedOut: true };
+    }
+
+    return { waitResult: raceResult.result, timedOut: false };
+  }
+
+  async run(config: ContainerConfig): Promise<ContainerResult> {
+    this.log.info({ image: config.image }, "Creating container");
+    const container = await this.docker.createContainer(this.buildContainerOptions(config));
 
     try {
       await container.start();
-
-      let timedOut = false;
-      let waitResult: { StatusCode: number };
-
-      if (config.timeoutMs) {
-        const timeoutPromise = new Promise<"timeout">((resolve) =>
-          setTimeout(() => resolve("timeout"), config.timeoutMs),
-        );
-        const raceResult = await Promise.race([
-          container.wait().then((r: { StatusCode: number }) => ({ kind: "done" as const, result: r })),
-          timeoutPromise.then(() => ({ kind: "timeout" as const })),
-        ]);
-
-        if (raceResult.kind === "timeout") {
-          timedOut = true;
-          this.log.warn({ containerId: container.id }, "Container timed out, stopping");
-          await container.stop();
-          waitResult = await container.wait();
-        } else {
-          waitResult = raceResult.result;
-        }
-      } else {
-        waitResult = await container.wait();
-      }
-
+      const { waitResult, timedOut } = await this.waitWithTimeout(container, config.timeoutMs);
       const logs = await container.logs({ stdout: true, stderr: true });
 
       return {
