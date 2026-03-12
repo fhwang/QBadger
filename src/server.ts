@@ -36,6 +36,19 @@ const HANDLERS: Record<string, Record<string, WebhookHandler>> = {
   },
 };
 
+function fireAndForget(
+  handler: WebhookHandler,
+  body: Record<string, unknown>,
+  deps: HandlerDeps,
+): void {
+  const maybePromise = handler(body, deps);
+  if (maybePromise instanceof Promise) {
+    maybePromise.catch((err: unknown) => {
+      logger.error({ err }, "Webhook handler failed");
+    });
+  }
+}
+
 function verifySignature(
   secret: string,
   payload: string,
@@ -87,7 +100,7 @@ export function createApp(webhookSecret: string, deps: HandlerDeps): express.Exp
 
       if (handler) {
         logger.info({ event, action }, "Handling webhook event");
-        handler(req.body as Record<string, unknown>, deps);
+        fireAndForget(handler, req.body as Record<string, unknown>, deps);
         res.json({ event, action, handled: true });
       } else {
         logger.info({ event, action }, "Unhandled webhook event");
