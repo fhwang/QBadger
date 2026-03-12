@@ -133,6 +133,23 @@ describe("ContainerRunner", () => {
     expect(mockContainer.remove).toHaveBeenCalled();
   });
 
+  it("returns non-zero exit code on container failure", async () => {
+    mockContainer = createMockContainer({
+      waitResult: { StatusCode: 1 },
+      logs: "Error: something failed\n",
+    });
+    mockDocker = createMockDocker(mockContainer);
+    runner = new ContainerRunner(mockDocker as never);
+
+    const result = await runner.run({
+      image: "qbadger-worker:latest",
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.logs).toBe("Error: something failed\n");
+    expect(result.timedOut).toBe(false);
+  });
+
   it("mounts read-write volumes when readOnly is false", async () => {
     await runner.run({
       image: "qbadger-worker:latest",
