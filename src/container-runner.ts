@@ -37,6 +37,9 @@ export class ContainerRunner {
     const container = await this.docker.createContainer({
       Image: config.image,
       Cmd: config.command,
+      Env: config.env
+        ? Object.entries(config.env).map(([k, v]) => `${k}=${v}`)
+        : undefined,
     });
 
     try {

@@ -58,4 +58,26 @@ describe("ContainerRunner", () => {
       timedOut: false,
     });
   });
+
+  it("passes environment variables to the container", async () => {
+    const result = await runner.run({
+      image: "qbadger-worker:latest",
+      env: {
+        ANTHROPIC_API_KEY: "sk-test",
+        GITHUB_TOKEN: "ghp-test",
+        TASK_PROMPT: "Fix the bug",
+      },
+    });
+
+    expect(mockDocker.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Env: [
+          "ANTHROPIC_API_KEY=sk-test",
+          "GITHUB_TOKEN=ghp-test",
+          "TASK_PROMPT=Fix the bug",
+        ],
+      }),
+    );
+    expect(result.exitCode).toBe(0);
+  });
 });
