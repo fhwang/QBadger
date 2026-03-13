@@ -92,6 +92,16 @@ export class GitHubService {
     return data;
   }
 
+  async findPullRequestForBranch(branchName: string) {
+    const { data } = await this.octokit.rest.pulls.list({
+      owner: this.owner,
+      repo: this.repo,
+      head: `${this.owner}:${branchName}`,
+      state: "open",
+    });
+    return data.length > 0 ? data[0] : null;
+  }
+
   async listCheckRunsForRef(ref: string) {
     const { data } = await this.octokit.rest.checks.listForRef({
       owner: this.owner,

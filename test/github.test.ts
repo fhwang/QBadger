@@ -16,6 +16,7 @@ function createMockOctokit() {
       pulls: {
         create: vi.fn(),
         update: vi.fn(),
+        list: vi.fn(),
         listReviewComments: vi.fn(),
       },
       checks: {
@@ -212,6 +213,38 @@ describe("GitHubService", () => {
         repo: "my-repo",
         pull_number: 10,
       });
+    });
+  });
+
+  describe("findPullRequestForBranch", () => {
+    it("returns the first open PR matching the branch", async () => {
+      const prData = [{ number: 55, title: "My PR" }];
+      mockOctokit.rest.pulls.list.mockResolvedValue({ data: prData });
+
+      const result = await service.findPullRequestForBranch("qbadger/42-add-login");
+
+      expect(result).toEqual({ number: 55, title: "My PR" });
+    });
+
+    it("calls octokit with correct params", async () => {
+      mockOctokit.rest.pulls.list.mockResolvedValue({ data: [{ number: 1 }] });
+
+      await service.findPullRequestForBranch("qbadger/42-add-login");
+
+      expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
+        owner: "my-org",
+        repo: "my-repo",
+        head: "my-org:qbadger/42-add-login",
+        state: "open",
+      });
+    });
+
+    it("returns null when no PR exists for the branch", async () => {
+      mockOctokit.rest.pulls.list.mockResolvedValue({ data: [] });
+
+      const result = await service.findPullRequestForBranch("qbadger/42-add-login");
+
+      expect(result).toBeNull();
     });
   });
 

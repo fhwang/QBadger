@@ -43,6 +43,7 @@ function makeDeps(): HandlerDeps {
       createBranch: vi.fn().mockResolvedValue({}),
       createPullRequest: vi.fn().mockResolvedValue({ number: 100 }),
       createComment: vi.fn().mockResolvedValue({}),
+      findPullRequestForBranch: vi.fn().mockResolvedValue(null),
     } as unknown as HandlerDeps["github"],
     runSession: vi.fn().mockResolvedValue(makeSuccessResult()),
     config: {
@@ -95,32 +96,55 @@ describe("handleIssuesAssigned", () => {
     );
   });
 
-  it("opens a PR on success", async () => {
-    await handleIssuesAssigned(makePayload(), deps);
-    expect(deps.github.createPullRequest).toHaveBeenCalledWith({
-      title: expect.stringContaining("Add login page"),
-      body: expect.stringContaining("#42"),
-      head: expect.stringMatching(/^qbadger\/42-/),
-      base: "main",
-    });
-  });
-
-  it("posts a comment on session error", async () => {
-    (deps.runSession as ReturnType<typeof vi.fn>).mockResolvedValue(makeErrorResult());
+  it("does not create a PR after successful session (Claude creates it)", async () => {
     await handleIssuesAssigned(makePayload(), deps);
     expect(deps.github.createPullRequest).not.toHaveBeenCalled();
+  });
+
+  it("posts a comment on the issue on session error", async () => {
+    (deps.runSession as ReturnType<typeof vi.fn>).mockResolvedValue(makeErrorResult());
+    await handleIssuesAssigned(makePayload(), deps);
     expect(deps.github.createComment).toHaveBeenCalledWith(
       42,
       expect.stringContaining("failed"),
     );
   });
 
-  it("posts a comment when session throws", async () => {
-    (deps.runSession as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("timeout"));
+  it("posts a timeout comment on the PR when session times out and PR exists", async () => {
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    (deps.runSession as ReturnType<typeof vi.fn>).mockRejectedValue(abortError);
+    (deps.github.findPullRequestForBranch as ReturnType<typeof vi.fn>).mockResolvedValue({ number: 99 });
+
+    await handleIssuesAssigned(makePayload(), deps);
+
+    expect(deps.github.findPullRequestForBranch).toHaveBeenCalledWith(
+      expect.stringMatching(/^qbadger\/42-/),
+    );
+    expect(deps.github.createComment).toHaveBeenCalledWith(
+      99,
+      expect.stringContaining("timed out"),
+    );
+  });
+
+  it("posts a timeout comment on the issue when session times out and no PR exists", async () => {
+    const abortError = new DOMException("The operation was aborted", "AbortError");
+    (deps.runSession as ReturnType<typeof vi.fn>).mockRejectedValue(abortError);
+    (deps.github.findPullRequestForBranch as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+    await handleIssuesAssigned(makePayload(), deps);
+
+    expect(deps.github.createComment).toHaveBeenCalledWith(
+      42,
+      expect.stringContaining("timed out"),
+    );
+  });
+
+  it("posts a comment on the issue when session throws a non-timeout error", async () => {
+    (deps.runSession as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("something broke"));
     await handleIssuesAssigned(makePayload(), deps);
     expect(deps.github.createComment).toHaveBeenCalledWith(
       42,
-      expect.stringContaining("timeout"),
+      expect.stringContaining("something broke"),
     );
   });
 });

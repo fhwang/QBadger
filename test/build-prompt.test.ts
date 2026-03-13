@@ -47,4 +47,24 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("#42");
     expect(prompt).not.toContain("null");
   });
+
+  it("includes gh run watch for waiting on CI", () => {
+    const prompt = buildPrompt(baseIssue, config);
+    expect(prompt).toContain("gh run watch");
+  });
+
+  it("instructs Claude to create the PR via gh pr create", () => {
+    const prompt = buildPrompt(baseIssue, config);
+    expect(prompt).toContain("gh pr create");
+  });
+
+  it("instructs Claude to post a summary comment on the PR", () => {
+    const prompt = buildPrompt(baseIssue, config);
+    expect(prompt).toMatch(/summary comment/i);
+  });
+
+  it("includes the target repo in PR creation instructions", () => {
+    const prompt = buildPrompt(baseIssue, config);
+    expect(prompt).toContain("lost-atlas/lost-atlas");
+  });
 });
