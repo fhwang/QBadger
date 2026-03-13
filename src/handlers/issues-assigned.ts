@@ -31,12 +31,6 @@ function timeoutComment(): string {
   return "QBadger session timed out while working on this issue. The session exceeded the configured timeout limit.";
 }
 
-interface PipelineContext {
-  body: Record<string, unknown>;
-  issueNumber: number;
-  deps: HandlerDeps;
-}
-
 async function preparePipeline(issueNumber: number, deps: HandlerDeps) {
   const issue = await deps.github.getIssue(issueNumber);
   const branchName = `qbadger/${issueNumber}-${slugify(issue.title)}`;
@@ -50,14 +44,14 @@ async function preparePipeline(issueNumber: number, deps: HandlerDeps) {
   return { branchName, issueSummary };
 }
 
-async function runSessionForIssue(ctx: PipelineContext, issueSummary: IssueSummary): Promise<void> {
-  const prompt = buildPrompt(issueSummary, ctx.deps.config);
-  const timeoutMs = ctx.deps.config.sessionTimeoutHours * MS_PER_HOUR;
-  const result = await ctx.deps.runSession(prompt, {}, timeoutMs);
+async function runSessionForIssue(issueNumber: number, issueSummary: IssueSummary, deps: HandlerDeps): Promise<void> {
+  const prompt = buildPrompt(issueSummary, deps.config);
+  const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
+  const result = await deps.runSession(prompt, {}, timeoutMs);
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";
-    await ctx.deps.github.createComment(ctx.issueNumber, failureComment(errorDetail));
+    await deps.github.createComment(issueNumber, failureComment(errorDetail));
   }
 }
 
@@ -89,12 +83,12 @@ async function handlePipelineError(
   }
 }
 
-async function runPipeline(body: Record<string, unknown>, issueNumber: number, deps: HandlerDeps): Promise<void> {
+async function runPipeline(issueNumber: number, deps: HandlerDeps): Promise<void> {
   let branchName: string | undefined;
   try {
     const prepared = await preparePipeline(issueNumber, deps);
     branchName = prepared.branchName;
-    await runSessionForIssue({ body, issueNumber, deps }, prepared.issueSummary);
+    await runSessionForIssue(issueNumber, prepared.issueSummary, deps);
   } catch (error) {
     if (isTimeoutError(error) && branchName) {
       await handleTimeoutError(branchName, issueNumber, deps);
@@ -118,5 +112,5 @@ export async function handleIssuesAssigned(
   }
 
   log.info("Bot assigned to issue, starting pipeline");
-  await runPipeline(body, issueNumber, deps);
+  await runPipeline(issueNumber, deps);
 }
