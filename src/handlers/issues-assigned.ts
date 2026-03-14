@@ -1,6 +1,7 @@
 import { logger } from "../logger.js";
 import { slugify } from "../slugify.js";
 import { buildPrompt } from "../build-prompt.js";
+import { formatError, isTimeoutError, notifyFailure, notifyTimeout } from "../failure-notifications.js";
 import type { IssueSummary } from "../issue-summary.js";
 import type { HandlerDeps } from "../server.js";
 
@@ -13,22 +14,6 @@ function extractAssignee(body: Record<string, unknown>): string | undefined {
 
 function extractIssueNumber(body: Record<string, unknown>): number {
   return (body.issue as Record<string, unknown>)?.number as number;
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function isTimeoutError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
-function failureComment(errorDetail: string): string {
-  return `QBadger session failed while working on this issue.\n\n**Error:** ${errorDetail}`;
-}
-
-function timeoutComment(): string {
-  return "QBadger session timed out while working on this issue. The session exceeded the configured timeout limit.";
 }
 
 async function preparePipeline(issueNumber: number, deps: HandlerDeps) {
@@ -51,35 +36,7 @@ async function runSessionForIssue(issueNumber: number, issueSummary: IssueSummar
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";
-    await deps.github.createComment(issueNumber, failureComment(errorDetail));
-  }
-}
-
-async function handleTimeoutError(
-  branchName: string,
-  issueNumber: number,
-  deps: HandlerDeps,
-): Promise<void> {
-  logger.error({ issueNumber, branchName }, "Session timed out");
-  try {
-    const pr = await deps.github.findPullRequestForBranch(branchName);
-    const commentTarget = pr ? pr.number : issueNumber;
-    await deps.github.createComment(commentTarget, timeoutComment());
-  } catch (commentError) {
-    logger.error({ error: formatError(commentError), issueNumber }, "Failed to post timeout comment");
-  }
-}
-
-async function handlePipelineError(
-  error: unknown,
-  issueNumber: number,
-  deps: HandlerDeps,
-): Promise<void> {
-  logger.error({ error: formatError(error), issueNumber }, "Pipeline failed");
-  try {
-    await deps.github.createComment(issueNumber, failureComment(formatError(error)));
-  } catch (commentError) {
-    logger.error({ error: formatError(commentError), issueNumber }, "Failed to post failure comment");
+    await notifyFailure(deps.github, issueNumber, new Error(errorDetail));
   }
 }
 
@@ -91,9 +48,11 @@ async function runPipeline(issueNumber: number, deps: HandlerDeps): Promise<void
     await runSessionForIssue(issueNumber, prepared.issueSummary, deps);
   } catch (error) {
     if (isTimeoutError(error) && branchName) {
-      await handleTimeoutError(branchName, issueNumber, deps);
+      logger.error({ issueNumber, branchName }, "Session timed out");
+      await notifyTimeout(deps.github, branchName, issueNumber);
     } else {
-      await handlePipelineError(error, issueNumber, deps);
+      logger.error({ error: formatError(error), issueNumber }, "Pipeline failed");
+      await notifyFailure(deps.github, issueNumber, error);
     }
   }
 }
