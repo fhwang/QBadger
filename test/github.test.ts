@@ -17,6 +17,7 @@ function createMockOctokit() {
         create: vi.fn(),
         update: vi.fn(),
         list: vi.fn(),
+        get: vi.fn(),
         listReviewComments: vi.fn(),
       },
       checks: {
@@ -209,6 +210,29 @@ describe("GitHubService", () => {
       await service.listReviewComments(10);
 
       expect(mockOctokit.rest.pulls.listReviewComments).toHaveBeenCalledWith({
+        owner: "my-org",
+        repo: "my-repo",
+        pull_number: 10,
+      });
+    });
+  });
+
+  describe("getPullRequest", () => {
+    it("returns pull request data from octokit", async () => {
+      const prData = { id: 1, number: 10, title: "My PR", body: "PR body" };
+      mockOctokit.rest.pulls.get.mockResolvedValue({ data: prData });
+
+      const result = await service.getPullRequest(10);
+
+      expect(result).toEqual(prData);
+    });
+
+    it("calls octokit with correct params", async () => {
+      mockOctokit.rest.pulls.get.mockResolvedValue({ data: {} });
+
+      await service.getPullRequest(10);
+
+      expect(mockOctokit.rest.pulls.get).toHaveBeenCalledWith({
         owner: "my-org",
         repo: "my-repo",
         pull_number: 10,
