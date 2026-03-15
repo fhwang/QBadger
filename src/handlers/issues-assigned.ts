@@ -1,11 +1,12 @@
 import { logger } from "../logger.js";
 import { slugify } from "../slugify.js";
 import { buildPrompt } from "../build-prompt.js";
-import { formatError, isTimeoutError, notifyFailure, notifyTimeout } from "../failure-notifications.js";
+import { isTimeoutError, notifyFailure, notifyTimeout } from "../failure-notifications.js";
 import type { IssueSummary } from "../issue-summary.js";
 import type { HandlerDeps } from "../server.js";
-
-const MS_PER_HOUR = 60 * 60 * 1000;
+import { TranscriptWriter } from "../transcript-writer.js";
+import { cleanupTranscripts } from "../transcript-cleanup.js";
+import { MS_PER_HOUR } from "../time-constants.js";
 
 function extractAssignee(body: Record<string, unknown>): string | undefined {
   return (body.assignee as Record<string, unknown>)?.login as string | undefined;
@@ -31,7 +32,9 @@ async function preparePipeline(issueNumber: number, deps: HandlerDeps) {
 async function runSessionForIssue(issueNumber: number, issueSummary: IssueSummary, deps: HandlerDeps): Promise<void> {
   const prompt = buildPrompt(issueSummary, deps.config);
   const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
-  const result = await deps.runSession(prompt, {}, timeoutMs);
+  const writer = new TranscriptWriter(deps.config.transcriptDir, `issue-${issueNumber}`);
+  await writer.open();
+  const result = await deps.runSession(prompt, {}, timeoutMs, writer);
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";
@@ -45,12 +48,11 @@ async function runPipeline(issueNumber: number, deps: HandlerDeps): Promise<void
     const prepared = await preparePipeline(issueNumber, deps);
     branchName = prepared.branchName;
     await runSessionForIssue(issueNumber, prepared.issueSummary, deps);
+    await cleanupTranscripts(deps.config.transcriptDir, deps.config.transcriptRetentionDays);
   } catch (error) {
     if (isTimeoutError(error) && branchName) {
-      logger.error({ issueNumber, branchName }, "Session timed out");
       await notifyTimeout(deps.github, branchName, issueNumber);
     } else {
-      logger.error({ error: formatError(error), issueNumber }, "Pipeline failed");
       await notifyFailure(deps.github, issueNumber, error);
     }
   }

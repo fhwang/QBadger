@@ -1,8 +1,9 @@
+import pino from "pino";
 import { Octokit } from "@octokit/rest";
 import { createApp, type HandlerConfig } from "./server.js";
 import { loadConfig, ConfigError } from "./config.js";
 import { GitHubService } from "./github.js";
-import { logger } from "./logger.js";
+import { initLogger } from "./logger.js";
 import { runSession } from "./session-runner.js";
 
 export { runSession } from "./session-runner.js";
@@ -13,13 +14,16 @@ let config: ReturnType<typeof loadConfig>;
 try {
   config = loadConfig();
 } catch (e) {
+  const fallbackLogger = pino({ name: "qbadger" });
   if (e instanceof ConfigError) {
-    logger.fatal(e.message);
+    fallbackLogger.fatal(e.message);
   } else {
-    logger.fatal(e, "Unexpected error loading configuration");
+    fallbackLogger.fatal(e, "Unexpected error loading configuration");
   }
   process.exit(1);
 }
+
+const logger = initLogger({ targetRepo: config.targetRepo, logDir: config.logDir });
 
 const octokit = new Octokit({ auth: config.githubToken });
 const github = new GitHubService(octokit, config.targetRepo);
@@ -29,6 +33,8 @@ const handlerConfig: HandlerConfig = {
   targetRepo: config.targetRepo,
   sessionTimeoutHours: config.sessionTimeoutHours,
   maxCiRetries: config.maxCiRetries,
+  transcriptDir: config.transcriptDir,
+  transcriptRetentionDays: config.transcriptRetentionDays,
 };
 
 const app = createApp(config.githubWebhookSecret, {

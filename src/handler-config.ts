@@ -3,4 +3,6 @@ export interface HandlerConfig {
   targetRepo: string;
   sessionTimeoutHours: number;
   maxCiRetries: number;
+  transcriptDir: string;
+  transcriptRetentionDays: number;
 }

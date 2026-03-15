@@ -9,14 +9,14 @@
       "count": 1
     }
   },
-  "src/handlers/issues-assigned.ts": {
-    "no-magic-numbers": {
-      "count": 3
+  "src/server.ts": {
+    "max-params": {
+      "count": 1
     }
   },
-  "src/handlers/pull-request-review-submitted.ts": {
-    "no-magic-numbers": {
-      "count": 3
+  "src/session-runner.ts": {
+    "max-params": {
+      "count": 1
     }
   },
   "test/config.test.ts": {

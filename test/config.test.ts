@@ -38,6 +38,9 @@ describe("loadConfig", () => {
       "SESSION_TIMEOUT_HOURS",
       "MAX_CI_RETRIES",
       "PORT",
+      "LOG_DIR",
+      "TRANSCRIPT_DIR",
+      "TRANSCRIPT_RETENTION_DAYS",
     ];
     for (const key of keysToClean) {
       delete process.env[key];
@@ -139,6 +142,27 @@ describe("loadConfig", () => {
         expect(config.port).toBe(3000);
       });
     });
+
+    it("applies default log dir", () => {
+      withEnv(REQUIRED_ENV, () => {
+        const config = loadConfig();
+        expect(config.logDir).toBe("./logs");
+      });
+    });
+
+    it("applies default transcript dir", () => {
+      withEnv(REQUIRED_ENV, () => {
+        const config = loadConfig();
+        expect(config.transcriptDir).toBe("./transcripts");
+      });
+    });
+
+    it("applies default transcript retention days", () => {
+      withEnv(REQUIRED_ENV, () => {
+        const config = loadConfig();
+        expect(config.transcriptRetentionDays).toBe(30);
+      });
+    });
   });
 
   describe("overrides", () => {
@@ -181,6 +205,27 @@ describe("loadConfig", () => {
       withEnv({ ...REQUIRED_ENV, PORT: "8080" }, () => {
         const config = loadConfig();
         expect(config.port).toBe(8080);
+      });
+    });
+
+    it("overrides log dir", () => {
+      withEnv({ ...REQUIRED_ENV, LOG_DIR: "/var/log/qbadger" }, () => {
+        const config = loadConfig();
+        expect(config.logDir).toBe("/var/log/qbadger");
+      });
+    });
+
+    it("overrides transcript dir", () => {
+      withEnv({ ...REQUIRED_ENV, TRANSCRIPT_DIR: "/data/transcripts" }, () => {
+        const config = loadConfig();
+        expect(config.transcriptDir).toBe("/data/transcripts");
+      });
+    });
+
+    it("overrides transcript retention days", () => {
+      withEnv({ ...REQUIRED_ENV, TRANSCRIPT_RETENTION_DAYS: "7" }, () => {
+        const config = loadConfig();
+        expect(config.transcriptRetentionDays).toBe(7);
       });
     });
   });
