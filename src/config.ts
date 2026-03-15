@@ -6,6 +6,9 @@ interface AppConfig extends HandlerConfig {
   anthropicApiKey: string;
   maxConcurrentSessions: number;
   port: number;
+  logDir: string;
+  transcriptDir: string;
+  transcriptRetentionDays: number;
 }
 
 export class ConfigError extends Error {
@@ -43,5 +46,8 @@ export function loadConfig(): AppConfig {
     sessionTimeoutHours: parseInt(process.env.SESSION_TIMEOUT_HOURS ?? "6", 10),
     maxCiRetries: parseInt(process.env.MAX_CI_RETRIES ?? "5", 10),
     port: parseInt(process.env.PORT ?? "3000", 10),
+    logDir: process.env.LOG_DIR ?? "./logs",
+    transcriptDir: process.env.TRANSCRIPT_DIR ?? "./transcripts",
+    transcriptRetentionDays: parseInt(process.env.TRANSCRIPT_RETENTION_DAYS ?? "30", 10),
   };
 }
