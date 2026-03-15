@@ -4,3 +4,7 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
+
+# Runtime output
+logs/
+transcripts/
