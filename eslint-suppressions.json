@@ -24,6 +24,19 @@
       "count": 2
     }
   },
+  "src/session-runner.ts": {
+    "max-params": {
+      "count": 1
+    },
+    "max-statements": {
+      "count": 1
+    }
+  },
+  "src/transcript-cleanup.ts": {
+    "no-magic-numbers": {
+      "count": 4
+    }
+  },
   "test/container-runner.test.ts": {
     "@typescript-eslint/no-empty-function": {
       "count": 1
