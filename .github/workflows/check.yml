@@ -22,3 +22,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm check
+
+      - name: Check ESLint suppressions haven't increased
+        run: bash scripts/check-suppressions.sh

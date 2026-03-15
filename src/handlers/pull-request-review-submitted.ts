@@ -3,7 +3,6 @@ import { buildReviewPrompt } from "../build-prompt.js";
 import type { ReviewComment, ReviewContext } from "../review-context.js";
 import type { HandlerDeps } from "../server.js";
 
-// eslint-disable-next-line no-magic-numbers
 const MS_PER_HOUR = 60 * 60 * 1000;
 const QBADGER_BRANCH_PREFIX = "qbadger/";
 
