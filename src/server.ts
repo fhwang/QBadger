@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
 import type { GitHubService } from "./github.js";
-import type { runSession as RunSessionFn } from "./session-runner.js";
+import type { Options, SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { TranscriptOptions } from "./session-runner.js";
 import { handleIssuesAssigned } from "./handlers/issues-assigned.js";
 import { handleIssueCommentCreated } from "./handlers/issue-comment-created.js";
 import { handleCheckSuiteCompleted } from "./handlers/check-suite-completed.js";
@@ -13,7 +14,7 @@ export type { HandlerConfig } from "./handler-config.js";
 
 export interface HandlerDeps {
   github: GitHubService;
-  runSession: typeof RunSessionFn;
+  runSession: (prompt: string, options?: Options, timeoutMs?: number, transcript?: TranscriptOptions) => Promise<SDKResultMessage>;
   config: HandlerConfig;
 }
 

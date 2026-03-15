@@ -51,6 +51,8 @@ function makeDeps(): HandlerDeps {
       targetRepo: "lost-atlas/lost-atlas",
       sessionTimeoutHours: 6,
       maxCiRetries: 5,
+      transcriptDir: "/tmp/test-transcripts",
+      transcriptRetentionDays: 30,
     },
   };
 }
@@ -93,6 +95,20 @@ describe("handleIssuesAssigned", () => {
       expect.stringContaining("#42"),
       expect.any(Object),
       6 * 60 * 60 * 1000,
+      expect.any(Object),
+    );
+  });
+
+  it("passes transcript context to runSession", async () => {
+    await handleIssuesAssigned(makePayload(), deps);
+    expect(deps.runSession).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      6 * 60 * 60 * 1000,
+      expect.objectContaining({
+        transcriptDir: "/tmp/test-transcripts",
+        transcriptContext: { type: "issue", identifier: "issue-42" },
+      }),
     );
   });
 

@@ -2,6 +2,8 @@ import { logger } from "../logger.js";
 import { buildReviewPrompt } from "../build-prompt.js";
 import type { ReviewComment, ReviewContext } from "../review-context.js";
 import type { HandlerDeps } from "../server.js";
+import type { TranscriptOptions } from "../session-runner.js";
+import { cleanupTranscripts } from "../transcript-cleanup.js";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 const QBADGER_BRANCH_PREFIX = "qbadger/";
@@ -70,12 +72,18 @@ async function fetchReviewContext(payload: ReviewPayload, deps: HandlerDeps): Pr
 async function runReviewSession(context: ReviewContext, deps: HandlerDeps): Promise<void> {
   const prompt = buildReviewPrompt(context, deps.config);
   const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
-  const result = await deps.runSession(prompt, {}, timeoutMs);
+  const transcript: TranscriptOptions = {
+    transcriptDir: deps.config.transcriptDir,
+    transcriptContext: { type: "review", identifier: `review-pr-${context.prNumber}` },
+  };
+  const result = await deps.runSession(prompt, {}, timeoutMs, transcript);
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";
     await deps.github.createComment(context.prNumber, failureComment(errorDetail));
   }
+
+  await cleanupTranscripts(deps.config.transcriptDir, deps.config.transcriptRetentionDays);
 }
 
 async function handleSessionError(error: unknown, payload: ReviewPayload, deps: HandlerDeps): Promise<void> {

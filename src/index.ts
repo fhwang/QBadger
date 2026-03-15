@@ -33,6 +33,8 @@ const handlerConfig: HandlerConfig = {
   targetRepo: config.targetRepo,
   sessionTimeoutHours: config.sessionTimeoutHours,
   maxCiRetries: config.maxCiRetries,
+  transcriptDir: config.transcriptDir,
+  transcriptRetentionDays: config.transcriptRetentionDays,
 };
 
 const app = createApp(config.githubWebhookSecret, {
