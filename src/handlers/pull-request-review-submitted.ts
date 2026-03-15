@@ -1,5 +1,6 @@
 import { logger } from "../logger.js";
-import { buildReviewPrompt, type ReviewComment } from "../build-prompt.js";
+import { buildReviewPrompt } from "../build-prompt.js";
+import type { ReviewComment, ReviewContext } from "../review-context.js";
 import type { HandlerDeps } from "../server.js";
 
 // eslint-disable-next-line no-magic-numbers
@@ -48,7 +49,7 @@ function toReviewComments(comments: Record<string, unknown>[]): ReviewComment[] 
   }));
 }
 
-async function runReviewSession(payload: ReviewPayload, deps: HandlerDeps): Promise<void> {
+async function fetchReviewContext(payload: ReviewPayload, deps: HandlerDeps): Promise<ReviewContext> {
   const { prNumber, branchName, reviewId, reviewerLogin } = payload;
   const [pr, review, comments] = await Promise.all([
     deps.github.getPullRequest(prNumber),
@@ -56,25 +57,25 @@ async function runReviewSession(payload: ReviewPayload, deps: HandlerDeps): Prom
     deps.github.listReviewComments(prNumber),
   ]);
 
-  const prompt = buildReviewPrompt(
-    {
-      prNumber,
-      prTitle: pr.title as string,
-      prBody: (pr.body as string) ?? null,
-      branchName,
-      reviewBody: (review.body as string) ?? null,
-      reviewerLogin,
-      reviewComments: toReviewComments(comments as unknown as Record<string, unknown>[]),
-    },
-    deps.config,
-  );
+  return {
+    prNumber,
+    prTitle: pr.title as string,
+    prBody: (pr.body as string) ?? null,
+    branchName,
+    reviewBody: (review.body as string) ?? null,
+    reviewerLogin,
+    reviewComments: toReviewComments(comments as unknown as Record<string, unknown>[]),
+  };
+}
 
+async function runReviewSession(context: ReviewContext, deps: HandlerDeps): Promise<void> {
+  const prompt = buildReviewPrompt(context, deps.config);
   const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
   const result = await deps.runSession(prompt, {}, timeoutMs);
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";
-    await deps.github.createComment(prNumber, failureComment(errorDetail));
+    await deps.github.createComment(context.prNumber, failureComment(errorDetail));
   }
 }
 
@@ -122,7 +123,8 @@ export async function handlePullRequestReviewSubmitted(
   logger.child(payload).info("Review submitted on QBadger PR, starting followup");
 
   try {
-    await runReviewSession(payload, deps);
+    const context = await fetchReviewContext(payload, deps);
+    await runReviewSession(context, deps);
   } catch (error) {
     await handleSessionError(error, payload, deps);
   }

@@ -1,21 +1,6 @@
 import type { HandlerConfig } from "./handler-config.js";
 import type { IssueSummary } from "./issue-summary.js";
-
-export interface ReviewComment {
-  path: string;
-  line: number | null;
-  body: string;
-}
-
-export interface ReviewContext {
-  prNumber: number;
-  prTitle: string;
-  prBody: string | null;
-  branchName: string;
-  reviewBody: string | null;
-  reviewerLogin: string;
-  reviewComments: ReviewComment[];
-}
+import type { ReviewContext } from "./review-context.js";
 
 export function buildPrompt(
   issue: IssueSummary,
