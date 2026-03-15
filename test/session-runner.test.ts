@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { UUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(),
@@ -40,8 +43,15 @@ function mockQueryStream(messages: Record<string, unknown>[]) {
 }
 
 describe("runSession", () => {
-  beforeEach(() => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
     vi.clearAllMocks();
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "qbadger-session-test-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
   it("returns a successful result", async () => {
@@ -152,5 +162,35 @@ describe("runSession", () => {
         abortController: expect.any(AbortController),
       }),
     });
+  });
+
+  it("writes transcript to disk when transcript options are provided", async () => {
+    const successResult = makeSuccessResult();
+    const initMsg = { type: "system", subtype: "init", session_id: "test-session-id" };
+    const assistantMsg = { type: "assistant", message: { content: "Working on it..." } };
+    mockQueryStream([initMsg, assistantMsg, successResult]);
+
+    await runSession("Say hello", {}, undefined, {
+      transcriptDir: tmpDir,
+      transcriptContext: { type: "issue", identifier: "issue-42" },
+    });
+
+    const files = await fs.readdir(tmpDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]!).toMatch(/issue-42\.jsonl$/);
+
+    const content = await fs.readFile(path.join(tmpDir, files[0]!), "utf-8");
+    const lines = content.trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toEqual(initMsg);
+    expect(lines[2]).toMatchObject({ type: "result", subtype: "success" });
+  });
+
+  it("does not write transcript when transcript options are not provided", async () => {
+    mockQueryStream([makeSuccessResult()]);
+    await runSession("Say hello");
+
+    const files = await fs.readdir(tmpDir);
+    expect(files).toHaveLength(0);
   });
 });

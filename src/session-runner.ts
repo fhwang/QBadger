@@ -1,19 +1,30 @@
 import { query, type Options, type SDKMessage, type SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
+import { TranscriptWriter, type TranscriptContext } from "./transcript-writer.js";
+import { logger } from "./logger.js";
 
-function findResult(stream: AsyncIterable<SDKMessage>) {
-  return async (): Promise<SDKResultMessage> => {
-    let result: SDKResultMessage | undefined;
-    for await (const message of stream) {
-      if (message.type === "result") {
-        result = message;
-      }
-    }
+export interface TranscriptOptions {
+  transcriptDir: string;
+  transcriptContext: TranscriptContext;
+}
 
-    if (!result) {
-      throw new Error("Session ended without a result message");
+async function collectResult(
+  stream: AsyncIterable<SDKMessage>,
+  writer: TranscriptWriter | undefined,
+): Promise<SDKResultMessage> {
+  let result: SDKResultMessage | undefined;
+  for await (const message of stream) {
+    if (writer) {
+      await writer.write(message as unknown as Record<string, unknown>);
     }
-    return result;
-  };
+    if (message.type === "result") {
+      result = message;
+    }
+  }
+
+  if (!result) {
+    throw new Error("Session ended without a result message");
+  }
+  return result;
 }
 
 function buildAbortController(options: Options, timeoutMs?: number) {
@@ -34,18 +45,34 @@ export async function runSession(
   prompt: string,
   options?: Options,
   timeoutMs?: number,
+  transcript?: TranscriptOptions,
 ): Promise<SDKResultMessage> {
   const sdkOptions = options ?? {};
   const { controller: abortController, timeoutId } = buildAbortController(sdkOptions, timeoutMs);
 
+  let writer: TranscriptWriter | undefined;
+  if (transcript) {
+    writer = new TranscriptWriter(transcript.transcriptDir, transcript.transcriptContext);
+    await writer.open();
+  }
+
   try {
-    return await findResult(query({
+    const result = await collectResult(query({
       prompt,
       options: { ...sdkOptions, abortController },
-    }))();
+    }), writer);
+
+    if (writer?.filePath) {
+      logger.info({ sessionId: result.session_id, transcriptFile: writer.filePath }, "Session transcript saved");
+    }
+
+    return result;
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
+    }
+    if (writer) {
+      await writer.close();
     }
   }
 }
