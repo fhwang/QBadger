@@ -83,6 +83,25 @@ export class GitHubService {
     return data;
   }
 
+  async getPullRequest(pullNumber: number) {
+    const { data } = await this.octokit.rest.pulls.get({
+      owner: this.owner,
+      repo: this.repo,
+      pull_number: pullNumber,
+    });
+    return data;
+  }
+
+  async getReview(pullNumber: number, reviewId: number) {
+    const { data } = await this.octokit.rest.pulls.getReview({
+      owner: this.owner,
+      repo: this.repo,
+      pull_number: pullNumber,
+      review_id: reviewId,
+    });
+    return data;
+  }
+
   async listReviewComments(pullNumber: number) {
     const { data } = await this.octokit.rest.pulls.listReviewComments({
       owner: this.owner,
