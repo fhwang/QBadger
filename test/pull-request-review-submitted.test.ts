@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handlePullRequestReviewSubmitted } from "../src/handlers/pull-request-review-submitted.js";
 import type { HandlerDeps } from "../src/server.js";
+import { TranscriptWriter } from "../src/transcript-writer.js";
 
 function makeSuccessResult() {
   return {
@@ -121,16 +122,13 @@ describe("handlePullRequestReviewSubmitted", () => {
     );
   });
 
-  it("passes transcript context to runSession", async () => {
+  it("passes a TranscriptWriter to runSession", async () => {
     await handlePullRequestReviewSubmitted(makePayload(), deps);
     expect(deps.runSession).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Object),
       6 * 60 * 60 * 1000,
-      expect.objectContaining({
-        transcriptDir: "/tmp/test-transcripts",
-        transcriptContext: { type: "review", identifier: "review-pr-100" },
-      }),
+      expect.any(TranscriptWriter),
     );
   });
 

@@ -2,7 +2,7 @@ import { logger } from "../logger.js";
 import { buildReviewPrompt } from "../build-prompt.js";
 import type { ReviewComment, ReviewContext } from "../review-context.js";
 import type { HandlerDeps } from "../server.js";
-import type { TranscriptOptions } from "../session-runner.js";
+import { TranscriptWriter } from "../transcript-writer.js";
 import { cleanupTranscripts } from "../transcript-cleanup.js";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -72,11 +72,9 @@ async function fetchReviewContext(payload: ReviewPayload, deps: HandlerDeps): Pr
 async function runReviewSession(context: ReviewContext, deps: HandlerDeps): Promise<void> {
   const prompt = buildReviewPrompt(context, deps.config);
   const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
-  const transcript: TranscriptOptions = {
-    transcriptDir: deps.config.transcriptDir,
-    transcriptContext: { type: "review", identifier: `review-pr-${context.prNumber}` },
-  };
-  const result = await deps.runSession(prompt, {}, timeoutMs, transcript);
+  const writer = new TranscriptWriter(deps.config.transcriptDir, `review-pr-${context.prNumber}`);
+  await writer.open();
+  const result = await deps.runSession(prompt, {}, timeoutMs, writer);
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";

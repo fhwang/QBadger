@@ -4,7 +4,7 @@ import { buildPrompt } from "../build-prompt.js";
 import { formatError, isTimeoutError, notifyFailure, notifyTimeout } from "../failure-notifications.js";
 import type { IssueSummary } from "../issue-summary.js";
 import type { HandlerDeps } from "../server.js";
-import type { TranscriptOptions } from "../session-runner.js";
+import { TranscriptWriter } from "../transcript-writer.js";
 import { cleanupTranscripts } from "../transcript-cleanup.js";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -33,11 +33,9 @@ async function preparePipeline(issueNumber: number, deps: HandlerDeps) {
 async function runSessionForIssue(issueNumber: number, issueSummary: IssueSummary, deps: HandlerDeps): Promise<void> {
   const prompt = buildPrompt(issueSummary, deps.config);
   const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
-  const transcript: TranscriptOptions = {
-    transcriptDir: deps.config.transcriptDir,
-    transcriptContext: { type: "issue", identifier: `issue-${issueNumber}` },
-  };
-  const result = await deps.runSession(prompt, {}, timeoutMs, transcript);
+  const writer = new TranscriptWriter(deps.config.transcriptDir, `issue-${issueNumber}`);
+  await writer.open();
+  const result = await deps.runSession(prompt, {}, timeoutMs, writer);
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";

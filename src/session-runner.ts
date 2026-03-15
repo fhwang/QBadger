@@ -1,11 +1,6 @@
 import { query, type Options, type SDKMessage, type SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
-import { TranscriptWriter, type TranscriptContext } from "./transcript-writer.js";
+import type { TranscriptWriter } from "./transcript-writer.js";
 import { logger } from "./logger.js";
-
-export interface TranscriptOptions {
-  transcriptDir: string;
-  transcriptContext: TranscriptContext;
-}
 
 async function collectResult(
   stream: AsyncIterable<SDKMessage>,
@@ -45,16 +40,10 @@ export async function runSession(
   prompt: string,
   options?: Options,
   timeoutMs?: number,
-  transcript?: TranscriptOptions,
+  writer?: TranscriptWriter,
 ): Promise<SDKResultMessage> {
   const sdkOptions = options ?? {};
   const { controller: abortController, timeoutId } = buildAbortController(sdkOptions, timeoutMs);
-
-  let writer: TranscriptWriter | undefined;
-  if (transcript) {
-    writer = new TranscriptWriter(transcript.transcriptDir, transcript.transcriptContext);
-    await writer.open();
-  }
 
   try {
     const result = await collectResult(query({

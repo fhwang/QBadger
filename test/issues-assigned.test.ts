@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleIssuesAssigned } from "../src/handlers/issues-assigned.js";
 import type { HandlerDeps } from "../src/server.js";
+import { TranscriptWriter } from "../src/transcript-writer.js";
 
 function makeSuccessResult() {
   return {
@@ -99,16 +100,13 @@ describe("handleIssuesAssigned", () => {
     );
   });
 
-  it("passes transcript context to runSession", async () => {
+  it("passes a TranscriptWriter to runSession", async () => {
     await handleIssuesAssigned(makePayload(), deps);
     expect(deps.runSession).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Object),
       6 * 60 * 60 * 1000,
-      expect.objectContaining({
-        transcriptDir: "/tmp/test-transcripts",
-        transcriptContext: { type: "issue", identifier: "issue-42" },
-      }),
+      expect.any(TranscriptWriter),
     );
   });
 

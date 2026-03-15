@@ -10,6 +10,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { runSession } from "../src/session-runner.js";
+import { TranscriptWriter } from "../src/transcript-writer.js";
 
 const mockedQuery = vi.mocked(query);
 
@@ -164,16 +165,15 @@ describe("runSession", () => {
     });
   });
 
-  it("writes transcript to disk when transcript options are provided", async () => {
+  it("writes transcript to disk when a writer is provided", async () => {
     const successResult = makeSuccessResult();
     const initMsg = { type: "system", subtype: "init", session_id: "test-session-id" };
     const assistantMsg = { type: "assistant", message: { content: "Working on it..." } };
     mockQueryStream([initMsg, assistantMsg, successResult]);
 
-    await runSession("Say hello", {}, undefined, {
-      transcriptDir: tmpDir,
-      transcriptContext: { type: "issue", identifier: "issue-42" },
-    });
+    const writer = new TranscriptWriter(tmpDir, "issue-42");
+    await writer.open();
+    await runSession("Say hello", {}, undefined, writer);
 
     const files = await fs.readdir(tmpDir);
     expect(files).toHaveLength(1);

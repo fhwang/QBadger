@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { TranscriptWriter, buildTranscriptFilename, type TranscriptContext } from "../src/transcript-writer.js";
+import { TranscriptWriter, buildTranscriptFilename } from "../src/transcript-writer.js";
 
 let tmpDir: string;
 
@@ -16,22 +16,19 @@ afterEach(async () => {
 
 describe("buildTranscriptFilename", () => {
   it("builds a filename with timestamp and identifier", () => {
-    const context: TranscriptContext = { type: "issue", identifier: "issue-42" };
-    const filename = buildTranscriptFilename(context, new Date("2026-03-15T10:30:00Z"));
+    const filename = buildTranscriptFilename("issue-42", new Date("2026-03-15T10:30:00Z"));
     expect(filename).toBe("2026-03-15T10-30-00Z-issue-42.jsonl");
   });
 
-  it("builds a filename for review context", () => {
-    const context: TranscriptContext = { type: "review", identifier: "review-pr-17" };
-    const filename = buildTranscriptFilename(context, new Date("2026-01-02T03:04:05Z"));
+  it("builds a filename for review identifier", () => {
+    const filename = buildTranscriptFilename("review-pr-17", new Date("2026-01-02T03:04:05Z"));
     expect(filename).toBe("2026-01-02T03-04-05Z-review-pr-17.jsonl");
   });
 });
 
 describe("TranscriptWriter", () => {
   it("writes messages as JSONL lines", async () => {
-    const context: TranscriptContext = { type: "issue", identifier: "issue-42" };
-    const writer = new TranscriptWriter(tmpDir, context);
+    const writer = new TranscriptWriter(tmpDir, "issue-42");
     await writer.open();
 
     await writer.write({ type: "system", subtype: "init", session_id: "sess-1" });
@@ -49,8 +46,7 @@ describe("TranscriptWriter", () => {
 
   it("creates the transcript directory if it does not exist", async () => {
     const nestedDir = path.join(tmpDir, "nested", "dir");
-    const context: TranscriptContext = { type: "issue", identifier: "issue-1" };
-    const writer = new TranscriptWriter(nestedDir, context);
+    const writer = new TranscriptWriter(nestedDir, "issue-1");
     await writer.open();
     await writer.write({ type: "system", subtype: "init" });
     await writer.close();
@@ -61,8 +57,7 @@ describe("TranscriptWriter", () => {
   });
 
   it("exposes the file path after open", async () => {
-    const context: TranscriptContext = { type: "review", identifier: "review-pr-5" };
-    const writer = new TranscriptWriter(tmpDir, context);
+    const writer = new TranscriptWriter(tmpDir, "review-pr-5");
     expect(writer.filePath).toBeUndefined();
     await writer.open();
     expect(writer.filePath).toBeDefined();
