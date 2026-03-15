@@ -101,6 +101,11 @@ describe("handleIssuesAssigned", () => {
     expect(deps.github.createPullRequest).not.toHaveBeenCalled();
   });
 
+  it("does not post any comments on successful session", async () => {
+    await handleIssuesAssigned(makePayload(), deps);
+    expect(deps.github.createComment).not.toHaveBeenCalled();
+  });
+
   it("posts a comment on the issue on session error", async () => {
     (deps.runSession as ReturnType<typeof vi.fn>).mockResolvedValue(makeErrorResult());
     await handleIssuesAssigned(makePayload(), deps);
