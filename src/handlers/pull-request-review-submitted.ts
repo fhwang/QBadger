@@ -4,8 +4,7 @@ import type { ReviewComment, ReviewContext } from "../review-context.js";
 import type { HandlerDeps } from "../server.js";
 import { TranscriptWriter } from "../transcript-writer.js";
 import { cleanupTranscripts } from "../transcript-cleanup.js";
-
-const MS_PER_HOUR = 60 * 60 * 1000;
+import { MS_PER_HOUR } from "../time-constants.js";
 const QBADGER_BRANCH_PREFIX = "qbadger/";
 
 interface ReviewPayload {

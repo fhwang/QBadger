@@ -1,13 +1,12 @@
 import { logger } from "../logger.js";
 import { slugify } from "../slugify.js";
 import { buildPrompt } from "../build-prompt.js";
-import { formatError, isTimeoutError, notifyFailure, notifyTimeout } from "../failure-notifications.js";
+import { isTimeoutError, notifyFailure, notifyTimeout } from "../failure-notifications.js";
 import type { IssueSummary } from "../issue-summary.js";
 import type { HandlerDeps } from "../server.js";
 import { TranscriptWriter } from "../transcript-writer.js";
 import { cleanupTranscripts } from "../transcript-cleanup.js";
-
-const MS_PER_HOUR = 60 * 60 * 1000;
+import { MS_PER_HOUR } from "../time-constants.js";
 
 function extractAssignee(body: Record<string, unknown>): string | undefined {
   return (body.assignee as Record<string, unknown>)?.login as string | undefined;
@@ -52,10 +51,8 @@ async function runPipeline(issueNumber: number, deps: HandlerDeps): Promise<void
     await cleanupTranscripts(deps.config.transcriptDir, deps.config.transcriptRetentionDays);
   } catch (error) {
     if (isTimeoutError(error) && branchName) {
-      logger.error({ issueNumber, branchName }, "Session timed out");
       await notifyTimeout(deps.github, branchName, issueNumber);
     } else {
-      logger.error({ error: formatError(error), issueNumber }, "Pipeline failed");
       await notifyFailure(deps.github, issueNumber, error);
     }
   }

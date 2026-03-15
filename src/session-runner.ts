@@ -36,6 +36,15 @@ function buildAbortController(options: Options, timeoutMs?: number) {
   return { controller: undefined, timeoutId: undefined };
 }
 
+async function cleanup(timeoutId: ReturnType<typeof setTimeout> | undefined, writer?: TranscriptWriter): Promise<void> {
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
+  if (writer) {
+    await writer.close();
+  }
+}
+
 export async function runSession(
   prompt: string,
   options?: Options,
@@ -57,11 +66,6 @@ export async function runSession(
 
     return result;
   } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    if (writer) {
-      await writer.close();
-    }
+    await cleanup(timeoutId, writer);
   }
 }

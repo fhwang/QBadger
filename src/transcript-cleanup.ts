@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { logger } from "./logger.js";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { MS_PER_DAY } from "./time-constants.js";
 
 async function processEntry(dir: string, entry: string, cutoff: number): Promise<void> {
   if (!entry.endsWith(".jsonl")) {
