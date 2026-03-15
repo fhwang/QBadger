@@ -9,6 +9,11 @@ export default tseslint.config(
     ignores: ["dist/"],
   },
   {
+    linterOptions: {
+      noInlineConfig: true,
+    },
+  },
+  {
     rules: {
       // Disable base rules superseded by TypeScript
       "no-unused-vars": "off",

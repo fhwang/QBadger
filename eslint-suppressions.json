@@ -1,0 +1,35 @@
+{
+  "src/handlers/check-suite-completed.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/handlers/issue-comment-created.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/handlers/issues-assigned.ts": {
+    "no-magic-numbers": {
+      "count": 3
+    }
+  },
+  "src/handlers/pull-request-review-submitted.ts": {
+    "no-magic-numbers": {
+      "count": 3
+    }
+  },
+  "test/config.test.ts": {
+    "@typescript-eslint/no-dynamic-delete": {
+      "count": 2
+    }
+  },
+  "test/container-runner.test.ts": {
+    "@typescript-eslint/no-empty-function": {
+      "count": 1
+    },
+    "no-empty-function": {
+      "count": 1
+    }
+  }
+}

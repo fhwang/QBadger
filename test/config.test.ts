@@ -12,7 +12,6 @@ function withEnv(vars: Record<string, string>, fn: () => void): void {
   } finally {
     for (const [key, value] of Object.entries(original)) {
       if (value === undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete process.env[key];
       } else {
         process.env[key] = value;
@@ -41,7 +40,6 @@ describe("loadConfig", () => {
       "PORT",
     ];
     for (const key of keysToClean) {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete process.env[key];
     }
   });

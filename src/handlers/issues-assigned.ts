@@ -5,7 +5,6 @@ import { formatError, isTimeoutError, notifyFailure, notifyTimeout } from "../fa
 import type { IssueSummary } from "../issue-summary.js";
 import type { HandlerDeps } from "../server.js";
 
-// eslint-disable-next-line no-magic-numbers
 const MS_PER_HOUR = 60 * 60 * 1000;
 
 function extractAssignee(body: Record<string, unknown>): string | undefined {
