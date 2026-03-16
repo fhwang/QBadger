@@ -2,6 +2,7 @@
 set -euo pipefail
 
 STACK_NAME="qbadger-secrets"
+REGION="${AWS_REGION:-us-east-1}"
 
 if [ $# -lt 4 ]; then
   echo "Usage: $0 <cloudflare-token> <anthropic-key> <github-token> <webhook-secret>"
@@ -10,6 +11,7 @@ fi
 
 aws cloudformation deploy \
   --stack-name "$STACK_NAME" \
+  --region "$REGION" \
   --template-file cloudformation/secrets.yaml \
   --parameter-overrides \
     CloudflareTunnelToken="$1" \

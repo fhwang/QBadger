@@ -2,6 +2,7 @@
 set -euo pipefail
 
 STACK_NAME="qbadger-instance"
+REGION="${AWS_REGION:-us-east-1}"
 
 if [ $# -lt 1 ]; then
   echo "Usage: $0 <alert-email> [instance-type] [volume-size]"
@@ -14,6 +15,7 @@ VOLUME_SIZE="${3:-50}"
 
 aws cloudformation deploy \
   --stack-name "$STACK_NAME" \
+  --region "$REGION" \
   --template-file cloudformation/instance.yaml \
   --parameter-overrides \
     AlertEmail="$ALERT_EMAIL" \
@@ -26,5 +28,6 @@ echo "Instance stack deployed: $STACK_NAME"
 echo "Instance ID:"
 aws cloudformation describe-stacks \
   --stack-name "$STACK_NAME" \
+  --region "$REGION" \
   --query 'Stacks[0].Outputs[?OutputKey==`InstanceId`].OutputValue' \
   --output text

@@ -300,10 +300,7 @@ Resources:
           chmod 600 /opt/qbadger/.env
 
           echo "=== Phase 6: GitHub auth (for ec2-user) ==="
-          mkdir -p /home/ec2-user/.config/gh
-          echo "$GH_TOKEN" | gh auth login --with-token
-          cp -r /root/.config/gh/* /home/ec2-user/.config/gh/
-          chown -R ec2-user:ec2-user /home/ec2-user/.config/gh
+          echo "$GH_TOKEN" | su -l ec2-user -c 'gh auth login --with-token'
 
           echo "=== Phase 7: Clone & build QBadger ==="
           git clone https://github.com/fhwang/QBadger.git /opt/qbadger/repo
