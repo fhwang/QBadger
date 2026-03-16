@@ -88,7 +88,9 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                   - logs:DescribeLogStreams
-                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/qbadger/*
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/qbadger/*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/qbadger/*:log-stream:*
       Tags:
         - Key: Project
           Value: qbadger
@@ -297,9 +299,11 @@ Resources:
           ENVFILE
           chmod 600 /opt/qbadger/.env
 
-          echo "=== Phase 6: GitHub auth ==="
+          echo "=== Phase 6: GitHub auth (for ec2-user) ==="
+          mkdir -p /home/ec2-user/.config/gh
           echo "$GH_TOKEN" | gh auth login --with-token
-          gh auth setup-git
+          cp -r /root/.config/gh/* /home/ec2-user/.config/gh/
+          chown -R ec2-user:ec2-user /home/ec2-user/.config/gh
 
           echo "=== Phase 7: Clone & build QBadger ==="
           git clone https://github.com/fhwang/QBadger.git /opt/qbadger/repo
@@ -336,8 +340,8 @@ Resources:
           WantedBy=multi-user.target
           QSVC
 
-          # Fix ownership so ec2-user can write logs/transcripts
-          chown -R ec2-user:ec2-user /opt/qbadger/logs /opt/qbadger/transcripts
+          # Fix ownership so ec2-user can run the service and write logs/transcripts
+          chown -R ec2-user:ec2-user /opt/qbadger
 
           systemctl daemon-reload
           systemctl enable qbadger && systemctl start qbadger
