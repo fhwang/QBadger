@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import crypto from "node:crypto";
 import request from "supertest";
 import { createApp, type HandlerDeps } from "../src/server.js";
+import { createSessionManager } from "../src/session-manager.js";
 
 const WEBHOOK_SECRET = "test-webhook-secret";
 
@@ -170,5 +171,32 @@ describe("Event routing", () => {
       action: "opened",
       handled: false,
     });
+  });
+});
+
+describe("Kill endpoint", () => {
+  it("calls kill on the session manager and returns 200", async () => {
+    const sessionManager = createSessionManager(10);
+    const deps = makeMockDeps();
+    deps.sessionManager = sessionManager;
+    const app = createApp(WEBHOOK_SECRET, deps);
+
+    const res = await request(app).post("/kill");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ killed: true });
+    expect(sessionManager.status().killed).toBe(true);
+  });
+});
+
+describe("Status endpoint", () => {
+  it("returns session manager status", async () => {
+    const sessionManager = createSessionManager(10);
+    const deps = makeMockDeps();
+    deps.sessionManager = sessionManager;
+    const app = createApp(WEBHOOK_SECRET, deps);
+
+    const res = await request(app).get("/status");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ active: 0, queued: 0, killed: false });
   });
 });

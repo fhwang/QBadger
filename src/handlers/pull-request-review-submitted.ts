@@ -73,7 +73,11 @@ async function runReviewSession(context: ReviewContext, deps: HandlerDeps): Prom
   const timeoutMs = deps.config.sessionTimeoutHours * MS_PER_HOUR;
   const writer = new TranscriptWriter(deps.config.transcriptDir, `review-pr-${context.prNumber}`);
   await writer.open();
-  const result = await deps.runSession(prompt, {}, timeoutMs, writer);
+
+  const doRun = () => deps.runSession(prompt, {}, timeoutMs, writer);
+  const result = deps.sessionManager
+    ? await deps.sessionManager.submit(doRun)
+    : await doRun();
 
   if (result.is_error) {
     const errorDetail = "errors" in result ? result.errors.join("\n") : "Unknown error";

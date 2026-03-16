@@ -8,6 +8,7 @@ import { handleIssueCommentCreated } from "./handlers/issue-comment-created.js";
 import { handleCheckSuiteCompleted } from "./handlers/check-suite-completed.js";
 import { handlePullRequestReviewSubmitted } from "./handlers/pull-request-review-submitted.js";
 import type { HandlerConfig } from "./handler-config.js";
+import type { SessionManager } from "./session-manager.js";
 import { logger } from "./logger.js";
 
 export type { HandlerConfig } from "./handler-config.js";
@@ -16,6 +17,7 @@ export interface HandlerDeps {
   github: GitHubService;
   runSession: (prompt: string, options?: Options, timeoutMs?: number, writer?: TranscriptWriter) => Promise<SDKResultMessage>;
   config: HandlerConfig;
+  sessionManager?: SessionManager;
 }
 
 const HTTP_UNAUTHORIZED = 401;
@@ -62,6 +64,49 @@ function verifySignature(
   );
 }
 
+function registerSessionManagerRoutes(app: express.Express, sm: SessionManager): void {
+  app.post("/kill", (_req: Request, res: Response) => {
+    sm.kill();
+    res.json({ killed: true });
+  });
+
+  app.get("/status", (_req: Request, res: Response) => {
+    res.json(sm.status());
+  });
+}
+
+function registerWebhookRoute(app: express.Express, webhookSecret: string, deps: HandlerDeps): void {
+  app.post(
+    "/webhook",
+    (req: Request, res: Response, next: NextFunction) => {
+      const signature = req.headers["x-hub-signature-256"] as string | undefined;
+      const rawBody = (req as Request & { rawBody: string }).rawBody;
+
+      if (!signature || !verifySignature(webhookSecret, rawBody, signature)) {
+        logger.warn("Webhook signature verification failed");
+        res.status(HTTP_UNAUTHORIZED).json({ error: "Invalid signature" });
+        return;
+      }
+      next();
+    },
+    (req: Request, res: Response) => {
+      const event = req.headers["x-github-event"] as string;
+      const action = (req.body as Record<string, unknown>).action as string;
+      const eventHandlers = HANDLERS[event];
+      const handler = eventHandlers?.[action];
+
+      if (handler) {
+        logger.info({ event, action }, "Handling webhook event");
+        fireAndForget(handler, req.body as Record<string, unknown>, deps);
+        res.json({ event, action, handled: true });
+      } else {
+        logger.info({ event, action }, "Unhandled webhook event");
+        res.json({ event, action, handled: false });
+      }
+    },
+  );
+}
+
 export function createApp(webhookSecret: string, deps: HandlerDeps): express.Express {
   const app = express();
 
@@ -77,38 +122,11 @@ export function createApp(webhookSecret: string, deps: HandlerDeps): express.Exp
     res.json({ status: "ok" });
   });
 
-  app.post(
-    "/webhook",
-    (req: Request, res: Response, next: NextFunction) => {
-      const signature = req.headers["x-hub-signature-256"] as
-        | string
-        | undefined;
-      const rawBody = (req as Request & { rawBody: string }).rawBody;
+  if (deps.sessionManager) {
+    registerSessionManagerRoutes(app, deps.sessionManager);
+  }
 
-      if (!signature || !verifySignature(webhookSecret, rawBody, signature)) {
-        logger.warn("Webhook signature verification failed");
-        res.status(HTTP_UNAUTHORIZED).json({ error: "Invalid signature" });
-        return;
-      }
-      next();
-    },
-    (req: Request, res: Response) => {
-      const event = req.headers["x-github-event"] as string;
-      const action = (req.body as Record<string, unknown>).action as string;
-
-      const eventHandlers = HANDLERS[event];
-      const handler = eventHandlers?.[action];
-
-      if (handler) {
-        logger.info({ event, action }, "Handling webhook event");
-        fireAndForget(handler, req.body as Record<string, unknown>, deps);
-        res.json({ event, action, handled: true });
-      } else {
-        logger.info({ event, action }, "Unhandled webhook event");
-        res.json({ event, action, handled: false });
-      }
-    },
-  );
+  registerWebhookRoute(app, webhookSecret, deps);
 
   return app;
 }
