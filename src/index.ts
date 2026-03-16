@@ -28,7 +28,7 @@ const logger = initLogger({ targetRepo: config.targetRepo, logDir: config.logDir
 
 const octokit = new Octokit({ auth: config.githubToken });
 const github = new GitHubService(octokit, config.targetRepo);
-const sessionManager = createSessionManager({ maxConcurrent: config.maxConcurrentSessions });
+const sessionManager = createSessionManager(config.maxConcurrentSessions);
 
 const handlerConfig: HandlerConfig = {
   botUsername: config.botUsername,

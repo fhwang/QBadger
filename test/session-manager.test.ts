@@ -3,20 +3,20 @@ import { createSessionManager } from "../src/session-manager.js";
 
 describe("createSessionManager", () => {
   it("runs a submitted task and returns its result", async () => {
-    const manager = createSessionManager({ maxConcurrent: 2 });
+    const manager = createSessionManager(2);
     const result = await manager.submit(() => Promise.resolve("done"));
     expect(result).toBe("done");
   });
 
   it("propagates task errors to the caller", async () => {
-    const manager = createSessionManager({ maxConcurrent: 2 });
+    const manager = createSessionManager(2);
     await expect(
       manager.submit(() => Promise.reject(new Error("boom"))),
     ).rejects.toThrow("boom");
   });
 
   it("queues tasks when max concurrency is reached", async () => {
-    const manager = createSessionManager({ maxConcurrent: 1 });
+    const manager = createSessionManager(1);
     const order: string[] = [];
 
     let resolveFirst!: () => void;
@@ -47,7 +47,7 @@ describe("createSessionManager", () => {
   });
 
   it("reports status with active, queued, and killed counts", async () => {
-    const manager = createSessionManager({ maxConcurrent: 1 });
+    const manager = createSessionManager(1);
 
     expect(manager.status()).toEqual({ active: 0, queued: 0, killed: false });
 
@@ -69,7 +69,7 @@ describe("createSessionManager", () => {
   });
 
   it("kill rejects new submissions", async () => {
-    const manager = createSessionManager({ maxConcurrent: 2 });
+    const manager = createSessionManager(2);
     manager.kill();
 
     await expect(
@@ -79,7 +79,7 @@ describe("createSessionManager", () => {
   });
 
   it("kill rejects queued tasks", async () => {
-    const manager = createSessionManager({ maxConcurrent: 1 });
+    const manager = createSessionManager(1);
 
     let resolveFirst!: () => void;
     const firstBlocks = new Promise<void>((r) => { resolveFirst = r; });

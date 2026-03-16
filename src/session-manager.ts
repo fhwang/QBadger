@@ -1,23 +1,16 @@
 export type SessionManager = ReturnType<typeof createSessionManager>;
 
-interface Waiter {
+interface SlotRequest {
   resolve: () => void;
   reject: (error: Error) => void;
 }
 
 const KILLED_ERROR = "Session manager has been killed";
 
-function rejectAll(queue: Waiter[]): void {
-  const error = new Error(KILLED_ERROR);
-  while (queue.length > 0) {
-    queue.shift()?.reject(error);
-  }
-}
-
-export function createSessionManager(config: { maxConcurrent: number }) {
+export function createSessionManager(maxConcurrent: number) {
   let active = 0;
   let killed = false;
-  const queue: Waiter[] = [];
+  const queue: SlotRequest[] = [];
 
   function release() {
     active--;
@@ -32,7 +25,7 @@ export function createSessionManager(config: { maxConcurrent: number }) {
     if (killed) {
       return Promise.reject(new Error(KILLED_ERROR));
     }
-    if (active < config.maxConcurrent) {
+    if (active < maxConcurrent) {
       active++;
       return Promise.resolve();
     }
@@ -53,7 +46,10 @@ export function createSessionManager(config: { maxConcurrent: number }) {
 
     kill(): void {
       killed = true;
-      rejectAll(queue);
+      const error = new Error(KILLED_ERROR);
+      while (queue.length > 0) {
+        queue.shift()?.reject(error);
+      }
     },
 
     status(): { active: number; queued: number; killed: boolean } {

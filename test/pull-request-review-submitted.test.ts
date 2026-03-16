@@ -174,7 +174,7 @@ describe("handlePullRequestReviewSubmitted", () => {
   });
 
   it("submits the session through the session manager", async () => {
-    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    const sessionManager = createSessionManager(10);
     const submitSpy = vi.spyOn(sessionManager, "submit");
     deps.sessionManager = sessionManager;
 
@@ -185,7 +185,7 @@ describe("handlePullRequestReviewSubmitted", () => {
   });
 
   it("posts a failure comment when session manager is killed", async () => {
-    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    const sessionManager = createSessionManager(10);
     sessionManager.kill();
     deps.sessionManager = sessionManager;
 

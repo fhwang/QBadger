@@ -176,7 +176,7 @@ describe("Event routing", () => {
 
 describe("Kill endpoint", () => {
   it("calls kill on the session manager and returns 200", async () => {
-    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    const sessionManager = createSessionManager(10);
     const deps = makeMockDeps();
     deps.sessionManager = sessionManager;
     const app = createApp(WEBHOOK_SECRET, deps);
@@ -190,7 +190,7 @@ describe("Kill endpoint", () => {
 
 describe("Status endpoint", () => {
   it("returns session manager status", async () => {
-    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    const sessionManager = createSessionManager(10);
     const deps = makeMockDeps();
     deps.sessionManager = sessionManager;
     const app = createApp(WEBHOOK_SECRET, deps);
