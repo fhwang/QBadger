@@ -203,3 +203,192 @@ Resources:
         - !Ref AlertTopic
       OKActions:
         - !Ref AlertTopic
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      MetadataOptions:
+        HttpTokens: required
+        HttpEndpoint: enabled
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: !Ref VolumeSize
+            VolumeType: !Ref VolumeType
+            DeleteOnTermination: true
+            Encrypted: true
+      Tags:
+        - Key: Name
+          Value: qbadger
+        - Key: Project
+          Value: qbadger
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          exec > >(tee /var/log/qbadger-userdata.log) 2>&1
+
+          echo "=== Phase 1: System packages ==="
+          dnf update -y
+          dnf install -y docker git tmux jq cronie gcc-c++ make python3
+          systemctl enable docker && systemctl start docker
+          usermod -aG docker ec2-user
+
+          echo "=== Phase 2: Node.js 22 + pnpm ==="
+          curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+          dnf install -y nodejs
+          npm install -g pnpm@9
+
+          echo "=== Phase 3: GitHub CLI ==="
+          dnf install -y 'dnf-command(config-manager)'
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+          dnf install -y gh
+
+          echo "=== Phase 4: Cloudflare Tunnel ==="
+          curl -fsSL -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /usr/local/bin/cloudflared
+
+          # Fetch tunnel token from Secrets Manager via IMDSv2
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+          CF_TOKEN=$(aws secretsmanager get-secret-value --secret-id qbadger/cloudflare-tunnel-token --region "$REGION" --query SecretString --output text)
+
+          mkdir -p /etc/cloudflared
+          echo "TUNNEL_TOKEN=$CF_TOKEN" > /etc/cloudflared/token.env
+          chmod 600 /etc/cloudflared/token.env
+
+          cat > /etc/systemd/system/cloudflared.service <<'CFSVC'
+          [Unit]
+          Description=Cloudflare Tunnel
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          EnvironmentFile=/etc/cloudflared/token.env
+          ExecStart=/usr/local/bin/cloudflared tunnel run --token ${!TUNNEL_TOKEN}
+          Restart=on-failure
+          RestartSec=10
+
+          [Install]
+          WantedBy=multi-user.target
+          CFSVC
+
+          systemctl daemon-reload
+          systemctl enable cloudflared && systemctl start cloudflared
+
+          echo "=== Phase 5: Fetch secrets & write .env ==="
+          mkdir -p /opt/qbadger
+          ANTHROPIC_KEY=$(aws secretsmanager get-secret-value --secret-id qbadger/anthropic-api-key --region "$REGION" --query SecretString --output text)
+          GH_TOKEN=$(aws secretsmanager get-secret-value --secret-id qbadger/github-bot-token --region "$REGION" --query SecretString --output text)
+          WEBHOOK_SECRET=$(aws secretsmanager get-secret-value --secret-id qbadger/github-webhook-secret --region "$REGION" --query SecretString --output text)
+
+          cat > /opt/qbadger/.env <<ENVFILE
+          ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+          GITHUB_TOKEN=$GH_TOKEN
+          GITHUB_WEBHOOK_SECRET=$WEBHOOK_SECRET
+          LOG_DIR=/opt/qbadger/logs
+          TRANSCRIPT_DIR=/opt/qbadger/transcripts
+          ENVFILE
+          chmod 600 /opt/qbadger/.env
+
+          echo "=== Phase 6: GitHub auth ==="
+          echo "$GH_TOKEN" | gh auth login --with-token
+          gh auth setup-git
+
+          echo "=== Phase 7: Clone & build QBadger ==="
+          git clone https://github.com/fhwang/QBadger.git /opt/qbadger/repo
+          cd /opt/qbadger/repo
+          pnpm install
+          pnpm build
+
+          echo "=== Phase 8: Build worker Docker image ==="
+          if [ -f Dockerfile ]; then
+            docker build -t qbadger-worker:latest .
+          fi
+
+          echo "=== Phase 9: QBadger systemd service ==="
+          mkdir -p /opt/qbadger/logs /opt/qbadger/transcripts
+
+          cat > /etc/systemd/system/qbadger.service <<'QSVC'
+          [Unit]
+          Description=QBadger AI Automation Service
+          After=network-online.target docker.service
+          Wants=network-online.target
+          Requires=docker.service
+
+          [Service]
+          Type=simple
+          WorkingDirectory=/opt/qbadger/repo
+          EnvironmentFile=/opt/qbadger/.env
+          ExecStart=/usr/bin/node /opt/qbadger/repo/dist/index.js
+          Restart=on-failure
+          RestartSec=10
+          User=ec2-user
+          Group=ec2-user
+
+          [Install]
+          WantedBy=multi-user.target
+          QSVC
+
+          # Fix ownership so ec2-user can write logs/transcripts
+          chown -R ec2-user:ec2-user /opt/qbadger/logs /opt/qbadger/transcripts
+
+          systemctl daemon-reload
+          systemctl enable qbadger && systemctl start qbadger
+
+          echo "=== Phase 10: CloudWatch Agent ==="
+          dnf install -y amazon-cloudwatch-agent
+
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWCONFIG'
+          {
+            "metrics": {
+              "namespace": "CWAgent",
+              "metrics_collected": {
+                "mem": {
+                  "measurement": ["mem_used_percent"],
+                  "metrics_collection_interval": 60,
+                  "append_dimensions": { "InstanceId": "${!aws:InstanceId}" }
+                },
+                "disk": {
+                  "measurement": ["disk_used_percent"],
+                  "metrics_collection_interval": 60,
+                  "resources": ["/"],
+                  "append_dimensions": { "InstanceId": "${!aws:InstanceId}" }
+                },
+                "procstat": [
+                  {
+                    "exe": "dockerd",
+                    "measurement": ["pid_count"],
+                    "metrics_collection_interval": 60,
+                    "append_dimensions": { "InstanceId": "${!aws:InstanceId}" }
+                  }
+                ]
+              }
+            }
+          }
+          CWCONFIG
+
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+
+          echo "=== Phase 11: Docker cleanup cron ==="
+          systemctl enable crond && systemctl start crond
+          echo "0 3 * * * root docker system prune -af --filter 'until=24h' >> /var/log/docker-prune.log 2>&1" > /etc/cron.d/docker-prune
+
+          echo "=== UserData complete ==="
+
+Outputs:
+  InstanceId:
+    Value: !Ref Instance
+    Description: EC2 instance ID
+  SecurityGroupId:
+    Value: !Ref SecurityGroup
+    Description: Security group ID
+  PublicIp:
+    Value: !GetAtt Instance.PublicIp
+    Description: Public IP (for reference only - access is via Cloudflare Tunnel)
