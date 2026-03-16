@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: QBadger EC2 instance stack (replaceable, references secrets stack)
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.large
+    AllowedValues: [t3.medium, t3.large, t3.xlarge, t3.2xlarge]
+    Description: EC2 instance type
+  VolumeSize:
+    Type: Number
+    Default: 50
+    MinValue: 20
+    MaxValue: 500
+    Description: EBS volume size in GB
+  VolumeType:
+    Type: String
+    Default: gp3
+    AllowedValues: [gp3, gp2]
+    Description: EBS volume type
+  AlertEmail:
+    Type: String
+    Description: Email address for CloudWatch alarm notifications
+
+Resources:
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: qbadger-alerts
+      Tags:
+        - Key: Project
+          Value: qbadger
+
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  ServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /qbadger/service
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: qbadger
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: QBadger EC2 - egress only, no inbound rules
+      Tags:
+        - Key: Name
+          Value: qbadger-sg
+        - Key: Project
+          Value: qbadger
