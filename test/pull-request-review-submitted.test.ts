@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handlePullRequestReviewSubmitted } from "../src/handlers/pull-request-review-submitted.js";
 import type { HandlerDeps } from "../src/server.js";
 import { TranscriptWriter } from "../src/transcript-writer.js";
+import { createSessionManager } from "../src/session-manager.js";
 
 function makeSuccessResult() {
   return {
@@ -170,5 +171,29 @@ describe("handlePullRequestReviewSubmitted", () => {
   it("does not post any comment on success", async () => {
     await handlePullRequestReviewSubmitted(makePayload(), deps);
     expect(deps.github.createComment).not.toHaveBeenCalled();
+  });
+
+  it("submits the session through the session manager", async () => {
+    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    const submitSpy = vi.spyOn(sessionManager, "submit");
+    deps.sessionManager = sessionManager;
+
+    await handlePullRequestReviewSubmitted(makePayload(), deps);
+
+    expect(submitSpy).toHaveBeenCalledOnce();
+    expect(deps.runSession).toHaveBeenCalledOnce();
+  });
+
+  it("posts a failure comment when session manager is killed", async () => {
+    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    sessionManager.kill();
+    deps.sessionManager = sessionManager;
+
+    await handlePullRequestReviewSubmitted(makePayload(), deps);
+
+    expect(deps.github.createComment).toHaveBeenCalledWith(
+      100,
+      expect.stringContaining("killed"),
+    );
   });
 });

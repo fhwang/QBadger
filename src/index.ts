@@ -5,6 +5,7 @@ import { loadConfig, ConfigError } from "./config.js";
 import { GitHubService } from "./github.js";
 import { initLogger } from "./logger.js";
 import { runSession } from "./session-runner.js";
+import { createSessionManager } from "./session-manager.js";
 
 export { runSession } from "./session-runner.js";
 export { ContainerRunner } from "./container-runner.js";
@@ -27,6 +28,7 @@ const logger = initLogger({ targetRepo: config.targetRepo, logDir: config.logDir
 
 const octokit = new Octokit({ auth: config.githubToken });
 const github = new GitHubService(octokit, config.targetRepo);
+const sessionManager = createSessionManager({ maxConcurrent: config.maxConcurrentSessions });
 
 const handlerConfig: HandlerConfig = {
   botUsername: config.botUsername,
@@ -41,6 +43,7 @@ const app = createApp(config.githubWebhookSecret, {
   github,
   runSession,
   config: handlerConfig,
+  sessionManager,
 });
 
 app.listen(config.port, () => {

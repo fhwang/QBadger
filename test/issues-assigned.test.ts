@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleIssuesAssigned } from "../src/handlers/issues-assigned.js";
 import type { HandlerDeps } from "../src/server.js";
 import { TranscriptWriter } from "../src/transcript-writer.js";
+import { createSessionManager } from "../src/session-manager.js";
 
 function makeSuccessResult() {
   return {
@@ -164,6 +165,30 @@ describe("handleIssuesAssigned", () => {
     expect(deps.github.createComment).toHaveBeenCalledWith(
       42,
       expect.stringContaining("something broke"),
+    );
+  });
+
+  it("submits the session through the session manager", async () => {
+    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    const submitSpy = vi.spyOn(sessionManager, "submit");
+    deps.sessionManager = sessionManager;
+
+    await handleIssuesAssigned(makePayload(), deps);
+
+    expect(submitSpy).toHaveBeenCalledOnce();
+    expect(deps.runSession).toHaveBeenCalledOnce();
+  });
+
+  it("posts a failure comment when session manager is killed", async () => {
+    const sessionManager = createSessionManager({ maxConcurrent: 10 });
+    sessionManager.kill();
+    deps.sessionManager = sessionManager;
+
+    await handleIssuesAssigned(makePayload(), deps);
+
+    expect(deps.github.createComment).toHaveBeenCalledWith(
+      42,
+      expect.stringContaining("killed"),
     );
   });
 });
