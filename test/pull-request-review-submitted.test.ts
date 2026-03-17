@@ -57,7 +57,7 @@ function makeDeps(): HandlerDeps {
     runSession: vi.fn().mockResolvedValue(makeSuccessResult()),
     config: {
       botUsername: "qbadger",
-      targetRepo: "lost-atlas/lost-atlas",
+      targetRepo: "example-org/example-repo",
       sessionTimeoutHours: 6,
       maxCiRetries: 5,
       transcriptDir: "/tmp/test-transcripts",

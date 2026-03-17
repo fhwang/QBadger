@@ -111,7 +111,7 @@ describe("loadConfig", () => {
     it("applies default target repo", () => {
       withEnv(REQUIRED_ENV, () => {
         const config = loadConfig();
-        expect(config.targetRepo).toBe("lost-atlas/lost-atlas");
+        expect(config.targetRepo).toBe("example-org/example-repo");
       });
     });
 

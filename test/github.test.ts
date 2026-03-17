@@ -332,10 +332,10 @@ describe("GitHubService integration", () => {
     Boolean(process.env.GITHUB_TOKEN);
 
   it.skipIf(!shouldRun)(
-    "reads a real issue from lost-atlas/lost-atlas",
+    "reads a real issue from example-org/example-repo",
     async () => {
       const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-      const service = new GitHubService(octokit, "lost-atlas/lost-atlas");
+      const service = new GitHubService(octokit, "example-org/example-repo");
       const issue = await service.getIssue(1);
 
       expect(issue.number).toBe(1);

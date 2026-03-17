@@ -11,7 +11,7 @@ describe("buildPrompt", () => {
   };
 
   const config = {
-    targetRepo: "lost-atlas/lost-atlas",
+    targetRepo: "example-org/example-repo",
     maxCiRetries: 5,
   };
 
@@ -65,7 +65,7 @@ describe("buildPrompt", () => {
 
   it("includes the target repo in PR creation instructions", () => {
     const prompt = buildPrompt(baseIssue, config);
-    expect(prompt).toContain("lost-atlas/lost-atlas");
+    expect(prompt).toContain("example-org/example-repo");
   });
 });
 
@@ -84,7 +84,7 @@ describe("buildReviewPrompt", () => {
   };
 
   const config = {
-    targetRepo: "lost-atlas/lost-atlas",
+    targetRepo: "example-org/example-repo",
     maxCiRetries: 5,
   };
 
