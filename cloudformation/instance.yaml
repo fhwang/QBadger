@@ -303,11 +303,8 @@ Resources:
           export HOME=/root
           echo "$GH_TOKEN" | gh auth login --with-token
           gh auth setup-git
-          GH_TOKEN_FILE=$(mktemp)
-          echo "$GH_TOKEN" > "$GH_TOKEN_FILE"
-          chmod 600 "$GH_TOKEN_FILE"
-          sudo -u ec2-user -i bash -c "cat $GH_TOKEN_FILE | gh auth login --with-token && gh auth setup-git"
-          rm -f "$GH_TOKEN_FILE"
+          echo "$GH_TOKEN" | sudo -u ec2-user -i gh auth login --with-token
+          sudo -u ec2-user -i gh auth setup-git
 
           echo "=== Phase 7: Clone & build QBadger ==="
           git clone https://github.com/fhwang/QBadger.git /opt/qbadger/repo
