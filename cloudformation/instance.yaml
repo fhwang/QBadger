@@ -300,6 +300,7 @@ Resources:
           chmod 600 /opt/qbadger/.env
 
           echo "=== Phase 6: GitHub auth ==="
+          export HOME=/root
           echo "$GH_TOKEN" | gh auth login --with-token
           gh auth setup-git
           GH_TOKEN_FILE=$(mktemp)
