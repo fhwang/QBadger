@@ -7,7 +7,7 @@ QBadger is a custom async AI automation system built from scratch on the Claude 
 - **Language:** TypeScript
 - **Runtime:** Node.js
 - **Package manager:** pnpm
-- **Target repo:** `lost-atlas/lost-atlas`
+- **Target repo:** `example-org/example-repo`
 - **Hosting:** EC2 (Amazon Linux 2023), QBadger runs directly as a systemd service
 - **Worker isolation:** Docker containers for Claude Code sessions
 - **Webhook delivery:** Cloudflare Tunnel (no inbound security group rules)
@@ -52,7 +52,7 @@ Express server that receives GitHub webhooks, verifies signatures (HMAC-SHA256),
 Centralized config module that loads from environment variables with validation and sensible defaults.
 
 - Required: `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, `ANTHROPIC_API_KEY`
-- Configurable: bot username, target repo (`lost-atlas/lost-atlas`), max concurrent sessions (default 10), session timeout (default 6 hours), max CI retries (default 5)
+- Configurable: bot username, target repo (`example-org/example-repo`), max concurrent sessions (default 10), session timeout (default 6 hours), max CI retries (default 5)
 - App fails to start with clear error messages when required env vars are missing
 
 **Validation:** Tests confirm required vars are enforced, defaults are applied, and overrides work.
@@ -99,9 +99,9 @@ Module for interacting with GitHub via Octokit.
 - Post comments on issues and PRs
 - Read PR review comments
 - Read check suite / check run status
-- Repo passed as config, scoped to `lost-atlas/lost-atlas` initially
+- Repo passed as config, scoped to `example-org/example-repo` initially
 
-**Validation:** Unit tests with mocked Octokit. One integration test that reads a real issue from `lost-atlas/lost-atlas` (skippable in CI).
+**Validation:** Unit tests with mocked Octokit. One integration test that reads a real issue from `example-org/example-repo` (skippable in CI).
 
 ---
 
@@ -117,7 +117,7 @@ End-to-end flow: GitHub issue assigned to bot → Claude Code implements it → 
 - On completion, opens a PR linking back to the issue
 - On session failure or timeout, posts a comment on the issue explaining what happened
 
-**Validation:** End-to-end test using a test issue on `lost-atlas/lost-atlas`. Verify branch created, PR opened. Dry-run mode available.
+**Validation:** End-to-end test using a test issue on `example-org/example-repo`. Verify branch created, PR opened. Dry-run mode available.
 
 ---
 
@@ -271,7 +271,7 @@ Route GitHub webhooks from Cloudflare to QBadger on EC2.
 
 - Cloudflared installed and configured in Subtask 15 (UserData)
 - Tunnel points to QBadger's webhook port (localhost:3000 or similar)
-- GitHub webhook configured on `lost-atlas/lost-atlas` with tunnel URL
+- GitHub webhook configured on `example-org/example-repo` with tunnel URL
 - Tunnel auto-restarts on failure (systemd)
 
 **Validation:** Send test webhook from GitHub webhook settings. Verify QBadger receives and processes it. Verify tunnel reconnects after restart.

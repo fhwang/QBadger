@@ -41,7 +41,7 @@ export function loadConfig(): AppConfig {
     githubWebhookSecret,
     anthropicApiKey,
     botUsername: process.env.BOT_USERNAME ?? "qbadger",
-    targetRepo: process.env.TARGET_REPO ?? "lost-atlas/lost-atlas",
+    targetRepo: process.env.TARGET_REPO ?? "example-org/example-repo",
     maxConcurrentSessions: parseInt(process.env.MAX_CONCURRENT_SESSIONS ?? "10", 10),
     sessionTimeoutHours: parseInt(process.env.SESSION_TIMEOUT_HOURS ?? "6", 10),
     maxCiRetries: parseInt(process.env.MAX_CI_RETRIES ?? "5", 10),

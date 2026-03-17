@@ -17,7 +17,7 @@ function makeMockDeps(): HandlerDeps {
     runSession: vi.fn(),
     config: {
       botUsername: "qbadger",
-      targetRepo: "lost-atlas/lost-atlas",
+      targetRepo: "example-org/example-repo",
       sessionTimeoutHours: 6,
       maxCiRetries: 5,
     },
