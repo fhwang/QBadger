@@ -23,6 +23,14 @@ export interface ContainerResult {
   timedOut: boolean;
 }
 
+const BYTES_PER_KB = 1024;
+const BYTES_PER_MB = BYTES_PER_KB * BYTES_PER_KB;
+const PERCENT = 100;
+
+function roundTwo(n: number): number {
+  return Math.round(n * PERCENT) / PERCENT;
+}
+
 function createTimeout(ms: number) {
   let timer: ReturnType<typeof setTimeout>;
   const promise = new Promise<"timeout">((resolve) => {
@@ -86,6 +94,34 @@ export class ContainerRunner {
     return this.collectResult(container, raceResult.statusCode, false);
   }
 
+  private async logContainerStats(
+    container: Dockerode.Container,
+    phase: "start" | "end",
+  ): Promise<void> {
+    try {
+      const stats = await container.stats({ stream: false });
+      const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;
+      const systemDelta = stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
+      const cpuPercent = systemDelta > 0
+        ? (cpuDelta / systemDelta) * stats.cpu_stats.online_cpus * PERCENT
+        : 0;
+      const memoryUsageMb = stats.memory_stats.usage / BYTES_PER_MB;
+      const memoryLimitMb = stats.memory_stats.limit / BYTES_PER_MB;
+      const memoryPercent = (stats.memory_stats.usage / stats.memory_stats.limit) * PERCENT;
+
+      this.log.info({
+        containerId: container.id,
+        phase,
+        cpuPercent: roundTwo(cpuPercent),
+        memoryUsageMb: roundTwo(memoryUsageMb),
+        memoryLimitMb: roundTwo(memoryLimitMb),
+        memoryPercent: roundTwo(memoryPercent),
+      }, "Container resource usage");
+    } catch (err) {
+      this.log.warn({ containerId: container.id, phase, err }, "Failed to collect container stats");
+    }
+  }
+
   private async collectResult(
     container: Dockerode.Container,
     exitCode: number,
@@ -100,17 +136,27 @@ export class ContainerRunner {
     };
   }
 
+  private async waitForResult(
+    container: Dockerode.Container,
+    config: ContainerConfig,
+  ): Promise<ContainerResult> {
+    if (config.timeoutMs) {
+      return this.raceWithTimeout(container, config.timeoutMs);
+    }
+    const waitResult = await container.wait();
+    return this.collectResult(container, waitResult.StatusCode, false);
+  }
+
   async run(config: ContainerConfig): Promise<ContainerResult> {
     this.log.info({ image: config.image }, "Creating container");
     const container = await this.docker.createContainer(this.buildContainerOptions(config));
 
     try {
       await container.start();
-      if (config.timeoutMs) {
-        return await this.raceWithTimeout(container, config.timeoutMs);
-      }
-      const result = await container.wait();
-      return await this.collectResult(container, result.StatusCode, false);
+      await this.logContainerStats(container, "start");
+      const result = await this.waitForResult(container, config);
+      await this.logContainerStats(container, "end");
+      return result;
     } finally {
       await container.remove({ force: true });
     }
