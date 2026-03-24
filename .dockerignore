@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.git/
+logs/
+transcripts/
+.env
+.env.*
+*.tsbuildinfo
+cloudformation/
+docs/
+test/
+.github/
