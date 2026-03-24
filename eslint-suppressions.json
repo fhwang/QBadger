@@ -23,13 +23,5 @@
     "@typescript-eslint/no-dynamic-delete": {
       "count": 2
     }
-  },
-  "test/container-runner.test.ts": {
-    "@typescript-eslint/no-empty-function": {
-      "count": 1
-    },
-    "no-empty-function": {
-      "count": 1
-    }
   }
 }

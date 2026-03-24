@@ -1,12 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ContainerRunner } from "../src/container-runner.js";
 
+const pendingResolvers: ((value: unknown) => void)[] = [];
+function neverResolve<T>(): Promise<T> {
+  return new Promise<T>((r) => { pendingResolvers.push(r as (value: unknown) => void); });
+}
+
+function createMockStats() {
+  return {
+    cpu_stats: {
+      cpu_usage: { total_usage: 500_000_000 },
+      system_cpu_usage: 10_000_000_000,
+      online_cpus: 2,
+    },
+    precpu_stats: {
+      cpu_usage: { total_usage: 400_000_000 },
+      system_cpu_usage: 9_000_000_000,
+    },
+    memory_stats: {
+      usage: 134_217_728, // 128 MiB
+      limit: 1_073_741_824, // 1 GiB
+    },
+  };
+}
+
 function createMockContainer(overrides?: {
   waitResult?: { StatusCode: number };
   logs?: string;
+  stats?: ReturnType<typeof createMockStats>;
 }) {
   const waitResult = overrides?.waitResult ?? { StatusCode: 0 };
   const logs = overrides?.logs ?? "session output\n";
+  const stats = overrides?.stats ?? createMockStats();
 
   return {
     id: "abc123",
@@ -15,6 +40,7 @@ function createMockContainer(overrides?: {
     logs: vi.fn().mockResolvedValue(logs),
     stop: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
+    stats: vi.fn().mockResolvedValue(stats),
   };
 }
 
@@ -116,8 +142,7 @@ describe("ContainerRunner", () => {
   });
 
   it("stops container and returns timedOut when timeout expires", async () => {
-    const neverResolve = new Promise<{ StatusCode: number }>(() => {});
-    mockContainer.wait.mockReturnValue(neverResolve);
+    mockContainer.wait.mockReturnValue(neverResolve<{ StatusCode: number }>());
     mockContainer.stop.mockImplementation(() => {
       mockContainer.wait.mockResolvedValue({ StatusCode: 137 });
       return Promise.resolve();
@@ -176,5 +201,35 @@ describe("ContainerRunner", () => {
         }),
       }),
     );
+  });
+
+  describe("container resource tracking", () => {
+    it("calls stats twice during a successful run (start and end)", async () => {
+      await runner.run({ image: "qbadger-worker:latest" });
+
+      expect(mockContainer.stats).toHaveBeenCalledTimes(2);
+      expect(mockContainer.stats).toHaveBeenCalledWith({ stream: false });
+    });
+
+    it("calls stats twice during a timed-out run", async () => {
+      mockContainer.wait.mockReturnValue(neverResolve<{ StatusCode: number }>());
+      mockContainer.stop.mockImplementation(() => {
+        mockContainer.wait.mockResolvedValue({ StatusCode: 137 });
+        return Promise.resolve();
+      });
+
+      await runner.run({ image: "qbadger-worker:latest", timeoutMs: 50 });
+
+      expect(mockContainer.stats).toHaveBeenCalledTimes(2);
+    });
+
+    it("still completes run if stats call fails", async () => {
+      mockContainer.stats.mockRejectedValue(new Error("stats unavailable"));
+
+      const result = await runner.run({ image: "qbadger-worker:latest" });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.timedOut).toBe(false);
+    });
   });
 });
